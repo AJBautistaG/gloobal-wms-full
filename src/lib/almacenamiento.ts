@@ -25,6 +25,7 @@ export const CLAVES = {
   estadoLotes: "momi-estado-lotes",
   merma: "momi-merma",
   exactitudLote: "momi-exactitud-lote",
+  entradasCentral: "momi-entradas-central",
   oscuro: "momi-pda-oscuro",
 } as const;
 

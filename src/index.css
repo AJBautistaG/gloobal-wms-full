@@ -29,6 +29,8 @@
   --color-critico: var(--critico);
   --color-frio: var(--frio);
   --color-neutro: var(--neutro);
+  --color-serie-entrada: var(--serie-entrada);
+  --color-serie-salida: var(--serie-salida);
 
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
@@ -58,6 +60,9 @@
   --critico: oklch(50.03% 0.1821 29.51);
   --frio: oklch(50.31% 0.0926 241.3);
   --neutro: oklch(60.12% 0.0199 345.99);
+  /* Series de gráficas (validadas para daltonismo contra la tarjeta): entradas y salidas. */
+  --serie-entrada: oklch(52% 0.14 245);
+  --serie-salida: oklch(52.74% 0.2119 5.21);
 }
 
 .dark {
@@ -82,6 +87,8 @@
   --critico: oklch(66.03% 0.1821 29.51);
   --frio: oklch(68.31% 0.0926 241.3);
   --neutro: oklch(72.12% 0.0159 345.99);
+  --serie-entrada: oklch(64% 0.13 245);
+  --serie-salida: oklch(64% 0.2 358);
 }
 
 /* Los flujos a pantalla completa (Recibir, Acomodar) usan colores sólidos de mayor contraste. */

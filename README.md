@@ -85,7 +85,24 @@ bloqueos, descarte y exactitud de lote.
   posición, se registra la diferencia, la posición se bloquea hasta contarla y el surtido sigue en otra existencia.
 - **Torre**: panel "Lote y caducidad" con KPI-14 (bultos que vencen en 30 días o menos, en % del inventario),
   KPI-15 (merma de los últimos 30 días, con causa obligatoria) y KPI-23 (% de lecturas de lote que coinciden con
-  el sistema), semáforo por ventana y el botón **Caducidad** para bloquear, liberar o mandar a descarte por lote.
+  el sistema), y gráficas: inventario por ventana de caducidad, qué vence por semana, merma diaria y por causa.
+
+## Existencia global del Almacén Central
+
+`src/data/inventario.ts` lleva la existencia por artículo: **apertura del día + entradas − salidas − merma**.
+
+- **Entradas**: al cerrar una recepción, lo recibido entra al artículo del Central (los códigos del proveedor se
+  convierten a su artículo y unidad; p. ej. MOM-3107 → MAN-10 en KG). Lo que va a cuarentena cuenta en existencia
+  pero no en disponible.
+- **Salidas**: en cuanto el surtidor toma una línea de la posición, sale del Central (con su hora).
+- **Merma**: un lote mandado a descarte hoy sale de la existencia.
+- **Disponible** = existencia − retenido (cuarentena y lotes bloqueados) − comprometido (pedidos en cola que aún no
+  se toman). Si no alcanza, se marca.
+
+La torre muestra el panel "Existencia del Almacén Central" (indicadores, movimiento por hora, salidas por destino) y
+el botón **Inventario** abre el detalle con tres pestañas: Existencias (tabla por artículo y kárdex del día),
+Caducidad por lote (bloquear, liberar, descartar) y Merma. Hay movimientos de ejemplo de la mañana para que no
+arranque vacío; todo lo que se haga en el PDA se refleja en vivo en la torre.
 
 ## Fecha
 

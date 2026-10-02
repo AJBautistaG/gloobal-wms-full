@@ -38,10 +38,11 @@ import {
   type Producto,
 } from "@/data/recepcion";
 import { agregarBultos, bultosDeResguardo, generarBultos, type ConteoLinea, type DecisionDano } from "@/data/bultos";
-import { anularIncidencias, crearIncidencia, esPendiente, incidenciasStore, type Incidencia } from "@/data/incidencias";
+import { anularIncidencias, crearIncidencia, esPendiente, incidenciasStore, operador, type Incidencia } from "@/data/incidencias";
 import { agregar, CLAVES } from "@/lib/almacenamiento";
 import { ordenesStore, registrarRecibido, reiniciarOrden, resumenOrden, saldoDe } from "@/data/ordenes";
 import { iniciarRecepcion, terminarRecepcion } from "@/data/recepciones";
+import { registrarEntradaRecepcion } from "@/data/inventario";
 import { ImagenProducto } from "@/components/ui/ImagenProducto";
 import { pitido } from "@/lib/feedback";
 import { generarSSCC, ssccLegible } from "@/lib/sscc";
@@ -575,6 +576,10 @@ export default function Recibir() {
       }
     });
     registrarRecibido(orden.oc, porCodigo, saldo > 0);
+    // Lo recibido entra a la existencia global del Central; lo que va a cuarentena no queda disponible.
+    const enCuarentena: Record<string, number> = {};
+    for (const b of bultos) if (b.cuarentena) enCuarentena[b.codigo] = (enCuarentena[b.codigo] ?? 0) + 1;
+    registrarEntradaRecepcion(orden, porCodigo, enCuarentena, operador().nombre);
     if (saldo > 0) {
       crearIncidencia({
         recepcion,

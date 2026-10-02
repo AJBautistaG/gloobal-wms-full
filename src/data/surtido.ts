@@ -239,6 +239,8 @@ export interface Resultado {
   sustituto?: string;
   lote?: string;
   posicion?: string;
+  /** Hora en que se tomó de la posición: desde ahí sale de la existencia del Central. */
+  hora?: string;
 }
 
 export interface Apartada {

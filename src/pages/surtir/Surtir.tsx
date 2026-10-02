@@ -200,7 +200,7 @@ export default function Surtir() {
         } else contenedor = { ...contenedor, bultos: contenedor.bultos + r.bultos };
       }
       return {
-        resultados: { ...e.resultados, [l.id]: { ...r, posicion } },
+        resultados: { ...e.resultados, [l.id]: { ...r, posicion, hora: horaActual() } },
         tomados: r.bultos > 0 ? [...e.tomados, { nombre: i.nombre, posicion, bultos: enBultos(i, r.bultos) }] : e.tomados,
         contenedor,
       };

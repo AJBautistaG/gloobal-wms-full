@@ -2,7 +2,7 @@ import { FechaHoy } from "@/lib/fecha";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSesion } from "@/lib/sesion";
-import { CalendarClock, CircleAlert, CircleCheck, Clock, FileText, LogOut, Moon, Smartphone, Sun, TriangleAlert } from "lucide-react";
+import { Boxes, CircleAlert, CircleCheck, Clock, FileText, LogOut, Moon, Smartphone, Sun, TriangleAlert } from "lucide-react";
 import { EstadoChip, useAvisosEnVivo } from "@/components/incidencias/Avisos";
 import { usePda } from "@/context/PdaContext";
 import { DECISOR, SEMAFORO, SUPERVISOR, esPendiente, incidenciasStore, procesoDe, type Incidencia } from "@/data/incidencias";
@@ -12,7 +12,7 @@ import { JEFE_ALMACEN } from "@/data/surtido";
 import { adelantarTransito, useVigilanciaTransito } from "@/data/vigilancia";
 import { cn, cuenta } from "@/lib/utils";
 import { VisorOrdenesEscritorio } from "./Ordenes";
-import { ConfigVidaUtil, IndicadoresLote, VisorCaducidad } from "./Caducidad";
+import { ConfigVidaUtil, IndicadoresLote, PanelExistencia, VisorInventario, type Pestana } from "./Caducidad";
 import { CampanaSupervisor, DetalleIncidencia, TareasInventario, quienDecide } from "./Piezas";
 
 // ── Piezas del tablero ───────────────────────────────────────────
@@ -254,8 +254,8 @@ export default function SupervisorDesktop() {
   const [seleccion, setSeleccion] = useState<string | null>(null);
   const [verOrdenes, setVerOrdenes] = useState(false);
   const cerrarOrdenes = useCallback(() => setVerOrdenes(false), []);
-  const [verCaducidad, setVerCaducidad] = useState(false);
-  const cerrarCaducidad = useCallback(() => setVerCaducidad(false), []);
+  const [verInventario, setVerInventario] = useState<Pestana | null>(null);
+  const cerrarInventario = useCallback(() => setVerInventario(null), []);
   useAvisosEnVivo(["supervisor"]);
   useVigilanciaTransito();
 
@@ -288,7 +288,7 @@ export default function SupervisorDesktop() {
   return (
     <div className="min-h-screen bg-muted">
       {verOrdenes && <VisorOrdenesEscritorio onCerrar={cerrarOrdenes} />}
-      {verCaducidad && <VisorCaducidad onCerrar={cerrarCaducidad} />}
+      {verInventario && <VisorInventario pestana={verInventario} onCerrar={cerrarInventario} />}
       <header className="sticky top-0 z-30 border-b border-border bg-card/95 backdrop-blur">
         <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-4 px-6 py-3">
           <div className="flex items-center gap-3">
@@ -299,7 +299,7 @@ export default function SupervisorDesktop() {
             </div>
           </div>
           <span className="rounded-full bg-primary-soft px-3 py-1 text-xs font-semibold text-primary">Maqueta con datos de ejemplo</span>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => setVerOrdenes(true)}
@@ -309,10 +309,10 @@ export default function SupervisorDesktop() {
             </button>
             <button
               type="button"
-              onClick={() => setVerCaducidad(true)}
+              onClick={() => setVerInventario("existencias")}
               className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border px-3 text-sm font-semibold"
             >
-              <CalendarClock size={16} aria-hidden /> Caducidad
+              <Boxes size={16} aria-hidden /> Inventario
             </button>
             <Link to="/pda" target="_blank" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border px-3 text-sm font-semibold">
               <Smartphone size={16} aria-hidden /> Abrir el PDA
@@ -457,8 +457,12 @@ export default function SupervisorDesktop() {
           </div>
         </Panel>
 
+        <Panel titulo="Existencia del Almacén Central" subtitulo="Apertura + entradas por recepción − salidas por surtido − merma, en vivo" className="lg:col-span-12">
+          <PanelExistencia onAbrir={() => setVerInventario("existencias")} />
+        </Panel>
+
         <Panel titulo="Lote y caducidad" subtitulo="Inventario próximo a vencer, merma y exactitud de lote" className="lg:col-span-12">
-          <IndicadoresLote onAbrir={() => setVerCaducidad(true)} />
+          <IndicadoresLote onAbrir={setVerInventario} />
         </Panel>
 
         <Panel titulo="Excepciones abiertas por tipo" subtitulo="Dónde se concentran los problemas" className="lg:col-span-5">

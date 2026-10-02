@@ -129,8 +129,15 @@ export interface Merma {
 
 /** Merma: incluye registros de ejemplo de días anteriores. */
 const MERMA_EJEMPLO: Merma[] = [
+  { fecha: sumarDias(HOY, -40), hora: "15:20", sku: "HUE-LIQ", lote: "L120825", bultos: 2, cantidad: 20, causa: "Vencido", quien: "Marisol Quintero" },
+  { fecha: sumarDias(HOY, -27), hora: "10:15", sku: "QCR-10", lote: "L010825", bultos: 2, cantidad: 20, causa: "Vencido", quien: "Marisol Quintero" },
+  { fecha: sumarDias(HOY, -24), hora: "17:05", sku: "HAR-GM50", lote: "L150725", bultos: 1, cantidad: 22.68, causa: "Dañado", quien: "Rosa Villalaz" },
+  { fecha: sumarDias(HOY, -20), hora: "12:30", sku: "CRE-UHT", lote: "L100825", bultos: 3, cantidad: 36, causa: "Vencido", quien: "Marisol Quintero" },
+  { fecha: sumarDias(HOY, -17), hora: "09:50", sku: "MAN-10", lote: "L050825", bultos: 1, cantidad: 10, causa: "Rechazo de Calidad", quien: "Marisol Quintero" },
+  { fecha: sumarDias(HOY, -13), hora: "14:40", sku: "AVE-10", lote: "L200725", bultos: 1, cantidad: 10, causa: "Dañado", quien: "Rosa Villalaz" },
   { fecha: sumarDias(HOY, -9), hora: "16:10", sku: "CRE-UHT", lote: "L280825", bultos: 2, cantidad: 24, causa: "Vencido", quien: "Marisol Quintero" },
   { fecha: sumarDias(HOY, -6), hora: "11:42", sku: "HUE-LIQ", lote: "L150925", bultos: 1, cantidad: 10, causa: "Dañado", quien: "Rosa Villalaz" },
+  { fecha: sumarDias(HOY, -4), hora: "13:15", sku: "QCR-10", lote: "L020925", bultos: 2, cantidad: 20, causa: "Vida útil corta, sin consumo posible", quien: "Marisol Quintero" },
   { fecha: sumarDias(HOY, -2), hora: "09:05", sku: "QCR-10", lote: "L050925", bultos: 1, cantidad: 10, causa: "Vencido", quien: "Marisol Quintero" },
 ];
 
@@ -199,6 +206,20 @@ export function indicadoresCaducidad(estados = estadoLotesStore.get(), merma = m
     mermaBultos: delMes.reduce((s, m) => s + m.bultos, 0),
     mermaRegistros: delMes.length,
     mermaPorCausa: CAUSAS_MERMA.map((c) => ({ causa: c, bultos: delMes.filter((m) => m.causa === c).reduce((s, m) => s + m.bultos, 0) })).filter((x) => x.bultos),
+    /** Merma por día de los últimos 30 días (el último es hoy), para la gráfica. */
+    mermaPorDia: Array.from({ length: 30 }, (_, n) => {
+      const fecha = sumarDias(HOY, n - 29);
+      const delDia = delMes.filter((m) => m.fecha === fecha);
+      return { fecha, bultos: delDia.reduce((s, m) => s + m.bultos, 0), registros: delDia };
+    }),
+    /** Bultos que vencen por semana: vencidos y las próximas 8 semanas. */
+    vencePorSemana: [
+      { etiqueta: "Vencidos", desde: -Infinity, hasta: -1 },
+      ...Array.from({ length: 8 }, (_, n) => ({ etiqueta: n === 0 ? "Esta semana" : `Sem ${n + 1}`, desde: n * 7, hasta: n * 7 + 6 })),
+    ].map((s) => {
+      const lotes = vivos.filter((b) => diasPara(b) >= s.desde && diasPara(b) <= s.hasta);
+      return { ...s, bultos: lotes.reduce((t, b) => t + b.bultos, 0), lotes: lotes.length, rango: Number.isFinite(s.desde) ? `${sumarDias(HOY, s.desde)}|${sumarDias(HOY, s.hasta)}` : "" };
+    }),
     /** KPI-23: exactitud de lote. */
     exactitudPct: lecturas ? Math.round((exactitud.coinciden / lecturas) * 1000) / 10 : 100,
     lecturas,
