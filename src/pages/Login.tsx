@@ -64,23 +64,24 @@ export default function Login() {
 
   return (
     <div className="grid min-h-screen bg-background lg:grid-cols-2">
-      <aside className="relative hidden overflow-hidden bg-primary p-12 text-primary-foreground lg:flex lg:flex-col lg:justify-between">
-        <div className="flex items-center gap-3">
-          <span className="grid size-11 place-items-center rounded-xl bg-primary-foreground font-display text-xl font-extrabold text-primary">M</span>
-          <span className="font-display text-xl font-extrabold">Momi WMS</span>
-        </div>
+      {/* El panel de marca usa el rosa del logotipo en claro y en oscuro. */}
+      <aside className="relative hidden overflow-hidden bg-[#c5005a] p-12 text-white lg:flex lg:flex-col lg:justify-between">
+        {/* Logotipo en blanco sobre el rosa de la marca */}
+        <img src="/momi-logo.png" alt="Momi" className="h-12 w-auto self-start brightness-0 invert" />
         <div>
-          <p className="font-display text-4xl leading-tight font-extrabold text-balance">Del andén a la vitrina, cada movimiento con nombre, hora y lote.</p>
-          <p className="mt-4 max-w-md text-primary-foreground/80">Recibo, acomodo, surtido, pedidos de las áreas y planeación en un solo lugar.</p>
+          <p className="font-display text-5xl leading-tight font-extrabold text-balance">Cada movimiento construye momentos felices.</p>
+          <p className="mt-5 max-w-md text-lg text-white/85">
+            Del andén a la vitrina: cada insumo que recibimos, acomodamos y surtimos termina en un pastel, un pan o un detalle que alguien va a disfrutar.
+          </p>
         </div>
-        <p className="text-sm text-primary-foreground/70">Dulcería Momi, S.A. · Panamá</p>
+        <p className="text-sm text-white/70">Dulcería Momi, S.A. · Panamá</p>
       </aside>
 
       <main className="flex items-center justify-center px-4 py-10">
         <div className="w-full max-w-sm">
-          <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <span className="grid size-11 place-items-center rounded-xl bg-primary font-display text-xl font-extrabold text-primary-foreground">M</span>
-            <span className="font-display text-xl font-extrabold">Momi WMS</span>
+          <div className="mb-8 lg:hidden">
+            <img src="/momi-logo.png" alt="Momi" className="h-10 w-auto" />
+            <p className="mt-3 font-display text-lg leading-snug font-extrabold text-primary">Cada movimiento construye momentos felices.</p>
           </div>
           <h1 className="font-display text-3xl font-extrabold">Iniciar sesión</h1>
           <p className="mt-1 text-muted-foreground">Entra con tu correo de Momi.</p>
