@@ -83,8 +83,8 @@ bloqueos, descarte y exactitud de lote.
 - **Acomodar**: ordena por FEFO y muestra el lote de cada bulto en la posición.
 - **Surtir**: cada lectura de lote cuenta para la exactitud. Si se lee un lote que el sistema no tiene en la
   posición, se registra la diferencia, la posición se bloquea hasta contarla y el surtido sigue en otra existencia.
-- **Torre**: panel "Lote y caducidad" con KPI-14 (bultos que vencen en 30 días o menos, en % del inventario),
-  KPI-15 (merma de los últimos 30 días, con causa obligatoria) y KPI-23 (% de lecturas de lote que coinciden con
+- **Torre**: panel "Lote y caducidad" con KPI-Inventario próximo a vencer (bultos que vencen en 30 días o menos, en % del inventario),
+  KPI-Merma (merma de los últimos 30 días, con causa obligatoria) y KPI-Exactitud por lote (% de lecturas de lote que coinciden con
   el sistema), y gráficas: inventario por ventana de caducidad, qué vence por semana, merma diaria y por causa.
 
 ## Existencia global del Almacén Central

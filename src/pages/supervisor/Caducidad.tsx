@@ -114,26 +114,26 @@ function ComposicionInventario({ k }: { k: Indicadores }) {
   );
 }
 
-/** Panel de la torre: KPI-14, KPI-15 y KPI-23 con sus gráficas. */
+/** Panel de la torre: inventario próximo a vencer, merma y exactitud por lote con sus gráficas. */
 export function IndicadoresLote({ onAbrir }: { onAbrir: (pestana: Pestana) => void }) {
   const k = useIndicadores();
   return (
     <div className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-3">
         <div>
-          <p className="text-sm text-muted-foreground">Próximo a vencer · KPI-14</p>
+          <p className="text-sm text-muted-foreground">KPI-Inventario próximo a vencer</p>
           <p className="mt-0.5 text-3xl font-semibold">{k.proximosPct} %</p>
           <p className="text-xs text-muted-foreground">
             {cuenta(k.proximos, "bulto")} {k.proximos === 1 ? "vence" : "vencen"} en 30 días o menos, de {k.totalBultos}
           </p>
         </div>
         <div>
-          <p className="text-sm text-muted-foreground">Merma · 30 días · KPI-15</p>
+          <p className="text-sm text-muted-foreground">KPI-Merma · 30 días</p>
           <p className="mt-0.5 text-3xl font-semibold">{cuenta(k.mermaBultos, "bulto")}</p>
           <p className="text-xs text-muted-foreground">{cuenta(k.mermaRegistros, "descarte")} con causa registrada</p>
         </div>
         <div>
-          <p className="text-sm text-muted-foreground">Exactitud de lote · KPI-23</p>
+          <p className="text-sm text-muted-foreground">KPI-Exactitud por lote</p>
           <p className={cn("mt-0.5 text-3xl font-semibold", k.exactitudPct < 95 && "text-alerta")}>{k.exactitudPct} %</p>
           <p className="text-xs text-muted-foreground">
             {k.lecturas - k.difieren} de {cuenta(k.lecturas, "lectura")} coinciden con el sistema
@@ -490,7 +490,7 @@ function PestanaMerma() {
       <div className="min-w-0 space-y-5">
         <section className="rounded-2xl border border-border bg-card p-5">
           <div className="grid gap-4 sm:grid-cols-3">
-            <Mosaico etiqueta="Merma · 30 días · KPI-15" valor={cuenta(k.mermaBultos, "bulto")} contexto={`${cuenta(k.mermaRegistros, "descarte")} con causa`} />
+            <Mosaico etiqueta="KPI-Merma · 30 días" valor={cuenta(k.mermaBultos, "bulto")} contexto={`${cuenta(k.mermaRegistros, "descarte")} con causa`} />
             <Mosaico etiqueta="Causa principal" valor={k.mermaPorCausa.slice().sort((a, b) => b.bultos - a.bultos)[0]?.causa ?? "—"} contexto="por bultos descartados" />
             <Mosaico etiqueta="Promedio diario" valor={(k.mermaBultos / 30).toFixed(1)} contexto="bultos por día" />
           </div>
@@ -635,7 +635,7 @@ function PestanaCaducidad({ quien }: { quien: string }) {
       <div className="min-w-0 space-y-5">
         <section className="grid gap-6 rounded-2xl border border-border bg-card p-5 md:grid-cols-2">
           <div>
-            <p className="font-display font-extrabold">Próximo a vencer · KPI-14 · {k.proximosPct} %</p>
+            <p className="font-display font-extrabold">KPI-Inventario próximo a vencer · {k.proximosPct} %</p>
             <p className="mb-3 text-sm text-muted-foreground">
               {cuenta(k.proximos, "bulto")} de {k.totalBultos} vencen en 30 días o menos
             </p>
@@ -690,7 +690,7 @@ function PestanaCaducidad({ quien }: { quien: string }) {
         </section>
       </div>
       <section className="rounded-2xl border border-border bg-card p-5">
-        <p className="font-display font-extrabold">Exactitud de lote · KPI-23</p>
+        <p className="font-display font-extrabold">KPI-Exactitud por lote</p>
         <p className="text-sm text-muted-foreground">
           {k.exactitudPct} % · {exactitud.difieren} de {cuenta(k.lecturas, "lectura")} no coincidieron
         </p>

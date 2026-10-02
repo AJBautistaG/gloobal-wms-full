@@ -7,7 +7,7 @@ import { insumoDe } from "./surtido";
 /**
  * Lote y caducidad en el almacén: inventario por lote y posición, política de vida útil al
  * recibir, bloqueos y descarte (merma), y la exactitud de lote (lote físico contra sistema).
- * Indicadores: KPI-14 inventario próximo a vencer, KPI-15 merma, KPI-23 exactitud de lote.
+ * Indicadores: KPI-Inventario próximo a vencer, KPI-Merma y KPI-Exactitud por lote.
  */
 
 // ── Política de vida útil mínima al recibir (configurable en la torre) ──
@@ -198,11 +198,11 @@ export function indicadoresCaducidad(estados = estadoLotesStore.get(), merma = m
   return {
     porVentana,
     totalBultos,
-    /** KPI-14: bultos que vencen en 30 días o menos (sin contar los ya vencidos). */
+    /** KPI-Inventario próximo a vencer: bultos que vencen en 30 días o menos (sin contar los ya vencidos). */
     proximos,
     proximosPct: totalBultos ? Math.round((proximos / totalBultos) * 100) : 0,
     vencidosSinBloquear: vivos.filter((b) => diasPara(b) < 0 && !estados[b.id]).length,
-    /** KPI-15: merma de los últimos 30 días. */
+    /** KPI-Merma: merma de los últimos 30 días. */
     mermaBultos: delMes.reduce((s, m) => s + m.bultos, 0),
     mermaRegistros: delMes.length,
     mermaPorCausa: CAUSAS_MERMA.map((c) => ({ causa: c, bultos: delMes.filter((m) => m.causa === c).reduce((s, m) => s + m.bultos, 0) })).filter((x) => x.bultos),
@@ -220,7 +220,7 @@ export function indicadoresCaducidad(estados = estadoLotesStore.get(), merma = m
       const lotes = vivos.filter((b) => diasPara(b) >= s.desde && diasPara(b) <= s.hasta);
       return { ...s, bultos: lotes.reduce((t, b) => t + b.bultos, 0), lotes: lotes.length, rango: Number.isFinite(s.desde) ? `${sumarDias(HOY, s.desde)}|${sumarDias(HOY, s.hasta)}` : "" };
     }),
-    /** KPI-23: exactitud de lote. */
+    /** KPI-Exactitud por lote. */
     exactitudPct: lecturas ? Math.round((exactitud.coinciden / lecturas) * 1000) / 10 : 100,
     lecturas,
     difieren: exactitud.difieren,
