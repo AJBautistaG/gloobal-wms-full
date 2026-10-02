@@ -21,6 +21,10 @@ export const CLAVES = {
   borradoresArea: "momi-borradores-area",
   planesArea: "momi-planes-area",
   existenciasArea: "momi-existencias-area",
+  politicaVidaUtil: "momi-politica-vida-util",
+  estadoLotes: "momi-estado-lotes",
+  merma: "momi-merma",
+  exactitudLote: "momi-exactitud-lote",
   oscuro: "momi-pda-oscuro",
 } as const;
 

@@ -1,5 +1,6 @@
 import { PrimerNombre } from "@/components/PrimerNombre";
-import { FechaHoy } from "@/lib/fecha";
+import { FechaHoy, HOY, sumarDias } from "@/lib/fecha";
+import { revisarFechaManual, revisarVidaUtil } from "@/data/caducidad";
 import { useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ArrowDown, ArrowUp, ShieldAlert, Snowflake, X } from "lucide-react";
@@ -810,6 +811,19 @@ export default function Recibir() {
     );
   }
   if (visor === "caja") {
+    const simular = (texto: string, accion: () => void) => (
+      <button
+        type="button"
+        onClick={() => {
+          setVisor(null);
+          pitido();
+          accion();
+        }}
+        className="min-h-9 w-full text-sm font-semibold opacity-70"
+      >
+        {texto}
+      </button>
+    );
     return (
       <Escaner
         subtitulo={prod.nombre}
@@ -822,16 +836,31 @@ export default function Recibir() {
           setLoteLeido(true);
         }}
         pie={
-          <button
-            type="button"
-            onClick={() => {
-              setVisor(null);
-              setLoteManual({ lote: "", fecha: prod.sinCaducidad ? "sin" : "" });
-            }}
-            className="min-h-11 w-full text-sm font-semibold opacity-80"
-          >
-            El código no lee
-          </button>
+          <div className="pt-1">
+            {!prod.sinCaducidad && (
+              <>
+                <p className="text-center text-xs opacity-50">Simular otra lectura</p>
+                {simular("Un lote con poca vida útil", () => {
+                  setLoteLeido(true);
+                  setLoteManual({ lote: prod.lote, fecha: sumarDias(HOY, prod.zona === "Seco" ? 20 : 4) });
+                })}
+                {simular("Un lote vencido", () => {
+                  setLoteLeido(true);
+                  setLoteManual({ lote: prod.lote, fecha: sumarDias(HOY, -3) });
+                })}
+              </>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setVisor(null);
+                setLoteManual({ lote: "", fecha: prod.sinCaducidad ? "sin" : "" });
+              }}
+              className="min-h-11 w-full text-sm font-semibold opacity-80"
+            >
+              El código no lee
+            </button>
+          </div>
         }
       />
     );
@@ -1381,7 +1410,41 @@ export default function Recibir() {
 
   // ── Lote y caducidad: se leen del código GS1 de la caja ─────────
   if (paso === "lote") {
-    const listo = loteLeido || (loteManual !== null && loteManual.lote.trim() !== "" && loteManual.fecha !== "");
+    const fechaMala = loteManual && !loteLeido && !prod.sinCaducidad ? revisarFechaManual(loteManual.fecha) : null;
+    const listo = loteLeido || (loteManual !== null && loteManual.lote.trim() !== "" && loteManual.fecha !== "" && !fechaMala?.bloquea);
+    const revision = listo && !prod.sinCaducidad ? revisarVidaUtil(caducidad, prod.zona !== "Seco") : null;
+    const fueraDePolitica = revision && revision.estado !== "ok";
+    /** Pasa a etiquetar con el lote real; si no cumple la política, toda la línea va a cuarentena. */
+    const seguirAEtiquetar = () => {
+      const c = conteos[indice];
+      const extra: Partial<ConteoLinea> = { lote, caduca: prod.sinCaducidad ? "" : caducidad };
+      if (c && revision && revision.estado !== "ok") {
+        const vencido = revision.estado === "vencido";
+        const inc = crearIncidencia({
+          ...contexto(),
+          tipo: "vida_util",
+          semaforo: vencido ? "rojo" : "amarillo",
+          decisor: "calidad",
+          titulo: vencido ? "Lote vencido al recibir" : "Vida útil por debajo de la política",
+          detalle: vencido
+            ? `El lote ${lote} venció hace ${Math.abs(revision.quedan)} días. ${enManejo(prod, c.cajas)} a cuarentena; Calidad decide si se rechaza.`
+            : `Al lote ${lote} le quedan ${revision.quedan} días y la política pide ${revision.minimo} para ${prod.zona === "Seco" ? "seco" : "refrigerado"}. ${enManejo(prod, c.cajas)} a cuarentena hasta que Calidad decida.`,
+          paso: "Lote",
+          cantidad: c.cajas,
+          unidad: c.cajas === 1 ? prod.unidadManejo : prod.unidadManejoPlural,
+          destino: "cuarentena",
+          foto: false,
+        });
+        extra.vidaUtil = { incidencia: inc.id, motivo: vencido ? "lote vencido" : `quedan ${revision.quedan} días` };
+        toast(`${inc.id} · ${enManejo(prod, c.cajas)} a cuarentena`, { description: "Calidad decide. Tú sigues con la recepción." });
+      }
+      setConteos((antes) => {
+        const nuevos = [...antes];
+        if (nuevos[indice]) nuevos[indice] = { ...nuevos[indice]!, ...extra };
+        return nuevos;
+      });
+      avanzar("etiquetar");
+    };
     const dias = prod.loteEnPiso && !prod.sinCaducidad ? diasEntre(prod.loteEnPiso, caducidad) : null;
     const alFondo = dias === null || dias >= 0;
     return pantalla(
@@ -1415,10 +1478,11 @@ export default function Recibir() {
                   type="date"
                   value={loteManual.fecha}
                   onChange={(e) => setLoteManual({ ...loteManual, fecha: e.target.value })}
-                  className="mt-1 h-12 w-full rounded-2xl border border-input bg-background px-3 font-mono"
+                  className={cn("mt-1 h-12 w-full rounded-2xl border bg-background px-3 font-mono", fechaMala?.bloquea ? "border-critico" : "border-input")}
                 />
               </label>
             )}
+            {fechaMala && <p className={cn("text-sm", fechaMala.bloquea ? "text-critico" : "text-alerta")}>{fechaMala.texto}</p>}
           </Tarjeta>
         )}
         {listo && (
@@ -1433,6 +1497,15 @@ export default function Recibir() {
                 <p className="font-display font-extrabold">Sin caducidad · va por fecha de entrada (FIFO)</p>
                 <p className="mt-1 text-sm">Queda detrás de lo que ya estaba.</p>
               </Tarjeta>
+            ) : fueraDePolitica ? (
+              <div role="alert" className={cn("mt-4 rounded-[18px] border-2 p-4", revision.estado === "vencido" ? "border-critico bg-critico/10" : "border-alerta bg-alerta/10")}>
+                <p className={cn("font-display font-extrabold", revision.estado === "vencido" ? "text-critico" : "text-alerta")}>
+                  {revision.estado === "vencido" ? `Lote vencido hace ${Math.abs(revision.quedan)} días` : `Vida útil por debajo de la política: le quedan ${revision.quedan} días`}
+                </p>
+                <p className="mt-1 text-sm">
+                  {revision.estado === "vencido" ? "No puede quedar disponible." : `La política pide al menos ${revision.minimo} días para ${prod.zona === "Seco" ? "seco" : "refrigerado"}.`} Toda la línea se recibe a cuarentena y decide Calidad. Tú sigues con la recepción.
+                </p>
+              </div>
             ) : (
               <div className={cn("mt-4 rounded-[18px] border p-4", alFondo ? "border-exito/40 bg-exito/10" : "border-alerta/40 bg-alerta/10")}>
                 <p className={cn("inline-flex items-center gap-1.5 font-display font-extrabold", alFondo ? "text-exito" : "text-alerta")}>
@@ -1452,7 +1525,7 @@ export default function Recibir() {
         )}
       </>,
       listo ? (
-        <BotonFlujo onClick={() => avanzar("etiquetar")}>Continuar a etiquetar</BotonFlujo>
+        <BotonFlujo onClick={seguirAEtiquetar}>{fueraDePolitica ? "Mandar a cuarentena y etiquetar" : "Continuar a etiquetar"}</BotonFlujo>
       ) : loteManual ? (
         <BotonFlujo disabled>Continuar a etiquetar</BotonFlujo>
       ) : (

@@ -15,7 +15,8 @@ import {
 } from "@/components/flujo/Flujo";
 import { ImagenProducto } from "@/components/ui/ImagenProducto";
 import { crearIncidencia, incidenciasStore, type Incidencia } from "@/data/incidencias";
-import { crearTareaConteo } from "@/data/posiciones";
+import { bloquearParaConteo, crearTareaConteo } from "@/data/posiciones";
+import { registrarLecturaLote } from "@/data/caducidad";
 import {
   CAPACIDAD_CONTENEDOR,
   ELEVADOR,
@@ -83,6 +84,8 @@ export default function Surtir() {
   const [problema, setProblema] = useState<Problema>(null);
   const [posAlterna, setPosAlterna] = useState<string | null>(null);
   const [vencidoBloqueado, setVencidoBloqueado] = useState(false);
+  /** Lote que se leyó en la posición y que el sistema no tiene ahí. */
+  const [loteDistinto, setLoteDistinto] = useState<string | null>(null);
   const [hojaOtroLote, setHojaOtroLote] = useState(false);
   const [motivoLote, setMotivoLote] = useState<string | null>(null);
   const [aviso, setAviso] = useState<{ incidencia: Incidencia; alSeguir: () => void; queSigue?: string } | null>(null);
@@ -490,6 +493,8 @@ export default function Surtir() {
           pitido();
           setError(null);
           setVencidoBloqueado(false);
+          setLoteDistinto(null);
+          registrarLecturaLote(true);
           setPaso("cont");
         }}
         pie={
@@ -498,6 +503,27 @@ export default function Surtir() {
             {simular(`Un lote más nuevo (${loteSiguiente(i)})`, () => {
               setError(`Ese lote vence después. Debes tomar ${i.lote!.codigo}.`);
               setHojaOtroLote(true);
+            })}
+            {simular("Un lote que el sistema no tiene aquí (L071025)", () => {
+              const leido = "L071025";
+              setLoteDistinto(leido);
+              setVencidoBloqueado(false);
+              setError(null);
+              registrarLecturaLote(false, { posicion, esperado: i.lote!.codigo, leido, quien: SURTIDOR.nombre });
+              if (!incidencias.some((x) => x.grupo === `lote|${linea.id}`)) {
+                const inc = crearIncidencia({
+                  ...contexto(t, linea, "Escanear lote"),
+                  tipo: "lote_distinto",
+                  semaforo: "amarillo",
+                  decisor: "supervisor",
+                  titulo: `Lote distinto al sistema en ${posicion}`,
+                  detalle: `El sistema tiene el lote ${i.lote!.codigo} en ${posicion}, pero se leyó ${leido}. La posición se bloquea hasta contarla; el surtido sigue con otra existencia.`,
+                  posicion,
+                  foto: false,
+                  grupo: `lote|${linea.id}`,
+                });
+                bloquearParaConteo(posicion, "Lote distinto al sistema", inc.id, i.nombre, i.sku);
+              }
             })}
             {simular("Un lote vencido (L180924)", () => {
               setVencidoBloqueado(true);
@@ -699,7 +725,17 @@ export default function Surtir() {
     return (
       <Marco
         boton={
-          vencidoBloqueado ? (
+          loteDistinto ? (
+            <BotonFlujo
+              onClick={() => {
+                setPosAlterna(otraExistencia(i));
+                setLoteDistinto(null);
+                setPaso("pos");
+              }}
+            >
+              Tomar de otra existencia · {otraExistencia(i)}
+            </BotonFlujo>
+          ) : vencidoBloqueado ? (
             <BotonFlujo
               variante="discreto"
               onClick={() => {
@@ -731,6 +767,14 @@ export default function Surtir() {
             </div>
           </div>
         </Tarjeta>
+        {loteDistinto && (
+          <div role="alert" className="mt-4 rounded-[14px] border-2 border-alerta bg-alerta/10 p-3">
+            <p className="flex items-center gap-2 font-extrabold text-alerta">
+              <Lock size={18} aria-hidden /> El lote {loteDistinto} no está registrado en {posicion}
+            </p>
+            <p className="mt-1 text-sm">El sistema tiene ahí el lote {i.lote.codigo}. La posición queda bloqueada hasta contarla y el supervisor ya lo sabe. Toma de otra existencia para no detener el pedido.</p>
+          </div>
+        )}
         {vencidoBloqueado && (
           <div role="alert" className="mt-4 rounded-[14px] border-2 border-critico bg-critico/10 p-3 text-critico">
             <p className="flex items-center gap-2 font-extrabold">

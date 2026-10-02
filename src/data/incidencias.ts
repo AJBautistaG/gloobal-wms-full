@@ -35,7 +35,9 @@ export type TipoIncidencia =
   | "sustituto"
   | "retraso_surtido"
   | "sin_confirmar"
-  | "diferencia_area";
+  | "diferencia_area"
+  | "vida_util"
+  | "lote_distinto";
 
 export type Semaforo = "verde" | "amarillo" | "rojo";
 export type Decisor = "calidad" | "compras" | "supervisor" | "maestros" | "area";
@@ -176,7 +178,7 @@ export const esPendiente = (i: Incidencia) => i.estado === "pendiente" || i.esta
 /** Las respuestas que puede dar quien decide, para el simulador. */
 export function respuestasPosibles(i: Incidencia): { id: Respuesta; texto: string; tono: "exito" | "critico" | "neutro" }[] {
   if (!esPendiente(i)) return [];
-  if (i.tipo === "dano") {
+  if (i.tipo === "dano" || i.tipo === "vida_util") {
     return [
       { id: "liberar", texto: "Liberar", tono: "exito" },
       { id: "mantener", texto: "Mantener cuarentena", tono: "neutro" },
@@ -190,7 +192,7 @@ export function respuestasPosibles(i: Incidencia): { id: Respuesta; texto: strin
     ];
   }
   // A1 y A9 se resuelven con el conteo en la tarea Contar; el supervisor solo puede adelantarse.
-  if (i.tipo === "posicion_ocupada" || i.tipo === "inventario_inesperado") {
+  if (i.tipo === "posicion_ocupada" || i.tipo === "inventario_inesperado" || i.tipo === "lote_distinto") {
     return [
       { id: "liberar_posicion", texto: "Liberar sin contar", tono: "neutro" },
       { id: "investigar", texto: "Investigar", tono: "neutro" },
@@ -356,7 +358,7 @@ export function responder(id: string, respuesta: Respuesta, { actor, motivo }: {
   let estado: EstadoIncidencia = i.estado;
   let resolucion = "";
 
-  if (i.tipo === "dano") {
+  if (i.tipo === "dano" || i.tipo === "vida_util") {
     if (respuesta === "liberar") {
       estado = "liberada";
       resolucion = `Calidad liberó ${i.cantidad} ${i.unidad}: pasan a disponible.`;

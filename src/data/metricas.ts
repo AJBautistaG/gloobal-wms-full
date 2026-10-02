@@ -25,6 +25,8 @@ export const TIPO_TEXTO: Record<TipoIncidencia, string> = {
   posicion_vacia: "Posición vacía",
   vencido: "Producto vencido",
   diferencia_area: "Diferencia al recibir",
+  vida_util: "Vida útil corta",
+  lote_distinto: "Lote distinto al sistema",
   sustituto: "Sustituto propuesto",
   retraso_surtido: "No alcanza la salida",
   sin_confirmar: "Entrega sin confirmar",

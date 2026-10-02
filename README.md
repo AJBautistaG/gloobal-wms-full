@@ -71,6 +71,22 @@ Cada línea de una OC tiene su etiqueta (`src/lib/gs1.ts`). El GTIN-14 es `07501
 dígito verificador GS1; el lote es iniciales del producto + fecha de la cita (AAMMDD) + letra de secuencia
 (`MF260926A`). Recibir usa ese mismo lote y caducidad, así que lo que se lee en el andén coincide con la etiqueta.
 
+## Lote y caducidad
+
+`src/data/caducidad.ts` concentra el inventario por lote y posición (datos de ejemplo relativos a hoy), la
+política de vida útil mínima al recibir (10 días refrigerado, 60 seco; editable en Configuración de la torre),
+bloqueos, descarte y exactitud de lote.
+
+- **Recibir**: si al lote le quedan menos días que la política, o ya venció, toda la línea se recibe a
+  cuarentena y se abre una incidencia para Calidad. Una caducidad tecleada a mano que ya pasó avisa; una de
+  más de 5 años no deja seguir. En el visor de la caja se pueden simular las dos lecturas.
+- **Acomodar**: ordena por FEFO y muestra el lote de cada bulto en la posición.
+- **Surtir**: cada lectura de lote cuenta para la exactitud. Si se lee un lote que el sistema no tiene en la
+  posición, se registra la diferencia, la posición se bloquea hasta contarla y el surtido sigue en otra existencia.
+- **Torre**: panel "Lote y caducidad" con KPI-14 (bultos que vencen en 30 días o menos, en % del inventario),
+  KPI-15 (merma de los últimos 30 días, con causa obligatoria) y KPI-23 (% de lecturas de lote que coinciden con
+  el sistema), semáforo por ventana y el botón **Caducidad** para bloquear, liberar o mandar a descarte por lote.
+
 ## Fecha
 
 La maqueta usa la fecha real del día. Los datos de ejemplo se escribieron para el 29 de septiembre de

@@ -2,7 +2,7 @@ import { FechaHoy } from "@/lib/fecha";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSesion } from "@/lib/sesion";
-import { CircleAlert, CircleCheck, Clock, FileText, LogOut, Moon, Smartphone, Sun, TriangleAlert } from "lucide-react";
+import { CalendarClock, CircleAlert, CircleCheck, Clock, FileText, LogOut, Moon, Smartphone, Sun, TriangleAlert } from "lucide-react";
 import { EstadoChip, useAvisosEnVivo } from "@/components/incidencias/Avisos";
 import { usePda } from "@/context/PdaContext";
 import { DECISOR, SEMAFORO, SUPERVISOR, esPendiente, incidenciasStore, procesoDe, type Incidencia } from "@/data/incidencias";
@@ -12,6 +12,7 @@ import { JEFE_ALMACEN } from "@/data/surtido";
 import { adelantarTransito, useVigilanciaTransito } from "@/data/vigilancia";
 import { cn, cuenta } from "@/lib/utils";
 import { VisorOrdenesEscritorio } from "./Ordenes";
+import { ConfigVidaUtil, IndicadoresLote, VisorCaducidad } from "./Caducidad";
 import { CampanaSupervisor, DetalleIncidencia, TareasInventario, quienDecide } from "./Piezas";
 
 // ── Piezas del tablero ───────────────────────────────────────────
@@ -253,6 +254,8 @@ export default function SupervisorDesktop() {
   const [seleccion, setSeleccion] = useState<string | null>(null);
   const [verOrdenes, setVerOrdenes] = useState(false);
   const cerrarOrdenes = useCallback(() => setVerOrdenes(false), []);
+  const [verCaducidad, setVerCaducidad] = useState(false);
+  const cerrarCaducidad = useCallback(() => setVerCaducidad(false), []);
   useAvisosEnVivo(["supervisor"]);
   useVigilanciaTransito();
 
@@ -285,6 +288,7 @@ export default function SupervisorDesktop() {
   return (
     <div className="min-h-screen bg-muted">
       {verOrdenes && <VisorOrdenesEscritorio onCerrar={cerrarOrdenes} />}
+      {verCaducidad && <VisorCaducidad onCerrar={cerrarCaducidad} />}
       <header className="sticky top-0 z-30 border-b border-border bg-card/95 backdrop-blur">
         <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-4 px-6 py-3">
           <div className="flex items-center gap-3">
@@ -302,6 +306,13 @@ export default function SupervisorDesktop() {
               className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border px-3 text-sm font-semibold"
             >
               <FileText size={16} aria-hidden /> Órdenes
+            </button>
+            <button
+              type="button"
+              onClick={() => setVerCaducidad(true)}
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border px-3 text-sm font-semibold"
+            >
+              <CalendarClock size={16} aria-hidden /> Caducidad
             </button>
             <Link to="/pda" target="_blank" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border px-3 text-sm font-semibold">
               <Smartphone size={16} aria-hidden /> Abrir el PDA
@@ -446,6 +457,10 @@ export default function SupervisorDesktop() {
           </div>
         </Panel>
 
+        <Panel titulo="Lote y caducidad" subtitulo="Inventario próximo a vencer, merma y exactitud de lote" className="lg:col-span-12">
+          <IndicadoresLote onAbrir={() => setVerCaducidad(true)} />
+        </Panel>
+
         <Panel titulo="Excepciones abiertas por tipo" subtitulo="Dónde se concentran los problemas" className="lg:col-span-5">
           <GraficaPorTipo datos={m.excepciones.porTipo} />
         </Panel>
@@ -511,7 +526,7 @@ export default function SupervisorDesktop() {
           )}
         </Panel>
 
-        <Panel titulo="Configuración" subtitulo="Tiempos máximos en antesala (minutos)" className="lg:col-span-5">
+        <Panel titulo="Configuración" subtitulo="Tiempos máximos en antesala (minutos) y vida útil al recibir" className="lg:col-span-5">
           <div className="grid grid-cols-2 gap-4">
             {(["frio", "seco"] as const).map((f) => (
               <div key={f} className="space-y-2 rounded-xl border border-border p-3">
@@ -533,6 +548,9 @@ export default function SupervisorDesktop() {
                 ))}
               </div>
             ))}
+          </div>
+          <div className="mt-4">
+            <ConfigVidaUtil />
           </div>
           <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
             <Clock size={14} aria-hidden /> El PDA aplica los cambios al instante.

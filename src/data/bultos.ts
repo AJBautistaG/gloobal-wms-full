@@ -44,6 +44,11 @@ export interface ConteoLinea {
   incidencia?: string;
   /** Incidencia del excedente que se mandó a resguardo al contar. */
   incidenciaExcedente?: string;
+  /** Lote y caducidad leídos de la caja (o tecleados), si difieren de los de la OC. */
+  lote?: string;
+  caduca?: string;
+  /** La caducidad no cumple la política de vida útil: toda la línea va a cuarentena. */
+  vidaUtil?: { incidencia: string; motivo: string };
 }
 
 const ANTESALA: Record<Zona, string> = {
@@ -73,6 +78,10 @@ export function generarBultos(
     if (!conteo) return;
     const tipo = TIPOS_DANO.find((t) => t.id === conteo.tipoDano);
     const decision = conteo.incidencia ? decisionDe(conteo.incidencia) : "pendiente";
+    const decisionVida = conteo.vidaUtil ? decisionDe(conteo.vidaUtil.incidencia) : null;
+    // Si Calidad rechazó el lote por vida útil, regresa completo en el camión.
+    if (decisionVida === "rechazada") return;
+    const porVidaUtil = !!conteo.vidaUtil && decisionVida !== "liberada";
     for (let c = 0; c < conteo.cajas; c++) {
       const danada = c < conteo.danadas;
       if (danada && decision === "rechazada") continue;
@@ -81,8 +90,8 @@ export function generarBultos(
         sscc: generarSSCC(indice++, orden.oc),
         producto: p.nombre,
         codigo: p.codigo,
-        lote: p.lote,
-        caduca: p.sinCaducidad ? "" : p.caducidad,
+        lote: conteo.lote ?? p.lote,
+        caduca: p.sinCaducidad ? "" : (conteo.caduca ?? p.caducidad),
         kg: kilos(p, 1),
         zona: p.zona,
         oc: orden.oc,
@@ -91,9 +100,9 @@ export function generarBultos(
         contenido: p.unidadesPorCaja > 1 ? cuenta(p.unidadesPorCaja, p.unidadInterna, p.unidadInternaPlural) : `${kilos(p, 1)} kg`,
         origen: ANTESALA[p.zona],
         loteEnPiso: p.loteEnPiso,
-        cuarentena: retenida ? `Dañado al recibir · ${tipo?.texto.toLowerCase() ?? "daño"}` : null,
+        cuarentena: porVidaUtil ? `Vida útil por debajo de la política · ${conteo.vidaUtil!.motivo}` : retenida ? `Dañado al recibir · ${tipo?.texto.toLowerCase() ?? "daño"}` : null,
         observacion: danada && !retenida ? `Daño: ${tipo?.texto.toLowerCase() ?? "revisado por Calidad"}` : undefined,
-        incidencia: danada ? conteo.incidencia : undefined,
+        incidencia: porVidaUtil ? conteo.vidaUtil!.incidencia : danada ? conteo.incidencia : undefined,
         desde: Date.now(),
       });
     }
