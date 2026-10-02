@@ -1,0 +1,175 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --font-sans: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-secondary: var(--secondary);
+  --color-accent: var(--accent);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-exito: var(--exito);
+  --color-alerta: var(--alerta);
+  --color-critico: var(--critico);
+  --color-frio: var(--frio);
+  --color-neutro: var(--neutro);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
+
+:root {
+  --radius: 0.5rem;
+  --background: oklch(97.87% 0.0034 354.69);
+  --foreground: oklch(22.49% 0.0096 341.18);
+  --card: oklch(100% 0 0);
+  --card-foreground: oklch(22.49% 0.0096 341.18);
+  --primary: oklch(52.74% 0.2119 5.21);
+  --primary-hover: oklch(45.62% 0.1834 4.57);
+  --primary-foreground: oklch(100% 0 0);
+  --primary-soft: oklch(94.43% 0.0257 349.74);
+  --secondary: oklch(94.43% 0.0257 349.74);
+  --accent: oklch(94.43% 0.0257 349.74);
+  --muted: oklch(96.05% 0.005 350);
+  --muted-foreground: oklch(49.67% 0.0198 344.15);
+  --destructive: oklch(50.03% 0.1821 29.51);
+  --border: oklch(90.47% 0.0137 347.97);
+  --input: oklch(90.47% 0.0137 347.97);
+  --ring: oklch(52.74% 0.2119 5.21);
+  --exito: oklch(51.5% 0.1115 156.41);
+  --alerta: oklch(59.09% 0.1325 65.12);
+  --critico: oklch(50.03% 0.1821 29.51);
+  --frio: oklch(50.31% 0.0926 241.3);
+  --neutro: oklch(60.12% 0.0199 345.99);
+}
+
+.dark {
+  --background: oklch(18.43% 0.0102 325.98);
+  --foreground: oklch(94.55% 0.0117 342.65);
+  --card: oklch(21.83% 0.0133 331.62);
+  --card-foreground: oklch(94.55% 0.0117 342.65);
+  --primary: oklch(70.43% 0.2079 358.49);
+  --primary-hover: oklch(76.43% 0.1779 358.49);
+  --primary-foreground: oklch(18.43% 0.0102 325.98);
+  --primary-soft: oklch(30% 0.0655 348);
+  --secondary: oklch(21.83% 0.0133 331.62);
+  --accent: oklch(30% 0.0655 348);
+  --muted: oklch(21.83% 0.0133 331.62);
+  --muted-foreground: oklch(72.12% 0.0159 345.99);
+  --destructive: oklch(63.03% 0.1821 29.51);
+  --border: oklch(31.99% 0.0198 339.85);
+  --input: oklch(31.99% 0.0198 339.85);
+  --ring: oklch(70.43% 0.2079 358.49);
+  --exito: oklch(68.5% 0.1315 156.41);
+  --alerta: oklch(76.09% 0.1325 65.12);
+  --critico: oklch(66.03% 0.1821 29.51);
+  --frio: oklch(68.31% 0.0926 241.3);
+  --neutro: oklch(72.12% 0.0159 345.99);
+}
+
+/* Los flujos a pantalla completa (Recibir, Acomodar) usan colores sólidos de mayor contraste. */
+.flujo {
+  --primary: #d50062;
+  --exito: #0e7a55;
+  --alerta: #9a6100;
+  --critico: #b3261e;
+}
+.dark .flujo {
+  --primary: oklch(70.43% 0.2079 358.49);
+  --exito: oklch(68.5% 0.1315 156.41);
+  --alerta: oklch(76.09% 0.1325 65.12);
+  --critico: oklch(66.03% 0.1821 29.51);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-muted font-sans text-foreground antialiased;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+@keyframes barrido {
+  0%,
+  100% {
+    top: 12%;
+  }
+  50% {
+    top: 88%;
+  }
+}
+.animate-barrido {
+  animation: barrido 2s ease-in-out infinite;
+}
+
+/* Impresión de órdenes: al imprimir se monta una copia del documento directo en <body> y se oculta lo demás. */
+.zona-impresion {
+  display: none;
+}
+@media print {
+  @page {
+    margin: 12mm;
+  }
+  html:has(.zona-impresion),
+  body:has(> .zona-impresion) {
+    background: #fff !important;
+  }
+  body:has(> .zona-impresion) > *:not(.zona-impresion) {
+    display: none !important;
+  }
+  .zona-impresion {
+    display: block;
+  }
+  .zona-impresion .imprimible {
+    max-width: none;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .zona-impresion tr,
+  .zona-impresion li {
+    break-inside: avoid;
+  }
+  /* Etiquetas a tamaño real (100 × 60 mm), una por caja. */
+  .zona-impresion .etiquetas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5mm;
+  }
+  .zona-impresion .etiqueta-gs1 {
+    width: 100mm;
+    height: 60mm;
+    aspect-ratio: auto;
+    break-inside: avoid;
+  }
+}

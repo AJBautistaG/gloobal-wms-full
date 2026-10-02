@@ -1,0 +1,76 @@
+# Momi PDA
+
+App de piso (PDA) del almacén de Momi, basada en la maqueta de Lovable
+[momi-stock-wise](https://momi-stock-wise.lovable.app/pda/recibir). Es una maqueta navegable con datos de
+ejemplo: no hay backend y lo que se registra vive en el `localStorage` del navegador.
+
+## Arrancar
+
+```bash
+npm install
+npm run dev        # http://localhost:5173/pda
+npm run build      # revisa tipos y genera dist/
+```
+
+## Despliegue (Vercel)
+
+El repositorio incluye `vercel.json`: Vercel detecta Vite, compila con `npm run build`, publica `dist/` y responde
+`index.html` en todas las rutas para que `/supervisor`, `/area` y `/pda/...` funcionen al recargar. Cada push a
+`main` publica una versión nueva; cada rama o PR genera su propia URL de prueba.
+
+## Tareas
+
+| Ruta | Tarea | Qué hace |
+| --- | --- | --- |
+| `/pda` | Tareas de piso | Menú filtrado por rol (Recibidor, Surtidor, Acomodador, Supervisor, Tienda). |
+| `/pda/recibir` | Recibir | Escanear la OC, registrar temperatura, contar por producto con tolerancias, leer lote y caducidad (GS1), imprimir y escanear etiquetas SSCC, cerrar la recepción. Incluye llegadas sin cita, vencidas, adelantadas y sin orden de compra (resguardo). |
+| `/pda/acomodar` | Acomodar | Toma los bultos de las recepciones cerradas y los ordena en viajes: primero lo refrigerado, luego por caducidad (FEFO). Muestra dónde queda cada lote en la posición, manda lo dañado a cuarentena y registra desviaciones. |
+| `/pda/surtir` | Surtir | Cola única por hora de salida (áreas, urgencias y Ruta Este): posición → cantidad en bultos → lote FEFO → contenedor. Excepciones con salidas ordenadas (otra existencia, parcial, sustituto, pendiente), contenedor que se parte al llenarse, salida a tránsito y escalamiento si el área no confirma. |
+| `/pda/supervisor` y `/supervisor` | Supervisor | Vista móvil para decidir en piso y torre de control de escritorio con indicadores en vivo, bandeja, bitácora y simulación de Calidad y Compras; lo del área (confirmar, cancelar, sustitutos) se hace desde el rol Área. El botón **Órdenes** muestra cada orden de compra (por recibir o recibida) y de surtido con el formato impreso: QR para escanear al recibir, líneas con avance y Code 128 de respaldo; se puede imprimir. En las OC, **Ver etiquetas** muestra la etiqueta GS1-128 de cada producto que se envía al proveedor ((01) GTIN, (10) lote, (17) caducidad, (400) OC); al imprimir sale una copia por caja. |
+| `/area?area=panaderia` (también `cocina`, `dulceria`) | Área · escritorio | Pide al almacén y da seguimiento: indicadores del día, mis pedidos con su recorrido, nueva solicitud en 3 pasos (a qué almacén, cuándo y quién recibe → catálogo con fotos y carrito → revisar y enviar), borrador, hoja de solicitud imprimible, cancelar con motivo, decidir sustitutos y avisos en vivo. El pedido entra a la cola del Surtidor. Pestañas **Planeación** (el jefe del área captura el plan semanal con detalle diario y lo confirma; con recetas de ejemplo se calcula lo que falta descontando existencias y lo que viene en camino, y se genera una solicitud en borrador que siempre se revisa) y **Existencias** (stock del área: sube al confirmar entregas, baja con el consumo del plan y se corrige con conteos). |
+| `/pda/area?area=panaderia` | Área · PDA | Para el momento de recibir: escanea el contenedor, dice quién recibe (quien surtió no puede confirmar) y confirma conforme o con diferencia. También ve el estado de sus pedidos y responde sustitutos. |
+| `/pda/contar` | Contar | Conteo ciego con segundo conteo automático si la diferencia supera el 3 %. |
+| `/pda/trasladar` | Trasladar | Armar la carga por escaneo, cerrar la salida (en tránsito) y recibir en destino. |
+| `/pda/tienda` | Tienda | Recepción en tienda contra la guía, con diferencias con causa. |
+
+En los visores de escaneo, **tocar** "Leer código" simula una lectura correcta y **mantener presionado 2 s**
+simula un código equivocado. En las pantallas de piso hay botones "Simular…" y también se puede teclear el
+código en el campo de escaneo (los lectores de PDA envían el código seguido de Enter).
+
+## Imágenes de producto
+
+Recibir, Acomodar, Surtir y el detalle del supervisor muestran una foto real de referencia de cada
+producto; al tocarla se amplía (Esc o tocar fuera la cierra). Las fotos son de productos equivalentes,
+tomadas de Open Food Facts y Wikimedia Commons con licencia libre; los créditos están en
+`public/productos/CREDITOS.md` y también se ven en la imagen ampliada.
+
+Para usar la foto del catálogo de Momi, copia el archivo a `public/productos/` y actualiza su entrada en
+`FOTOS` dentro de `src/data/imagenes.ts`. Un código sin foto muestra una ilustración de su empaque, y uno
+sin foto ni ilustración, una caja con "?".
+
+## Etiquetas GS1-128
+
+Cada línea de una OC tiene su etiqueta (`src/lib/gs1.ts`). El GTIN-14 es `075012345` + los dígitos del código + el
+dígito verificador GS1; el lote es iniciales del producto + fecha de la cita (AAMMDD) + letra de secuencia
+(`MF260926A`). Recibir usa ese mismo lote y caducidad, así que lo que se lee en el andén coincide con la etiqueta.
+
+## Fecha
+
+La maqueta usa la fecha real del día. Los datos de ejemplo se escribieron para el 29 de septiembre de
+2026 y se recorren a hoy (`src/lib/fecha.ts`): la OC en andén siempre tiene cita hoy, la vencida es de
+hace cuatro días, la adelantada es para dentro de tres, y lotes y caducidades conservan su vida útil.
+
+## Estructura
+
+```
+src/
+  data/          datos de ejemplo (recepción, piso, ventana, tienda) y modelo de bultos
+  components/
+    flujo/       piezas de los flujos a pantalla completa (Marco, Escaner, Contador, Hoja…)
+    piso/        marco de las tareas de piso (Pantalla, Dato, barra de conexión)
+    ui/          botón, campo de escaneo, chips
+  hooks/         useConexion (cola sin señal), usePulso (confirmación con tono y vibración)
+  pages/         una pantalla por tarea
+```
+
+Stack: React 19, Vite, TypeScript, Tailwind CSS 4, React Router, lucide-react y sonner.
