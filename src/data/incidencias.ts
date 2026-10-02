@@ -1,6 +1,7 @@
 import { CLAVES } from "@/lib/almacenamiento";
 import { crearStore } from "@/lib/store";
 import { rel } from "@/lib/fecha";
+import { usuarioActual } from "@/lib/sesion";
 import { fechaLarga, horaActual } from "@/lib/utils";
 import { actualizarBultos, agregarBultos, aplicarDecisionDano, quitarBultos, type Bulto } from "./bultos";
 import { notificar } from "./notificaciones";
@@ -255,7 +256,11 @@ type NuevaIncidencia = Omit<Incidencia, "id" | "hora" | "creada" | "estado" | "u
   registradaPor?: Actor;
 };
 
-export const OPERADOR: Actor = { nombre: "Rodolfo Paz", rol: "Operador de piso" };
+/** Quien está usando el PDA: el usuario que inició sesión en esta pestaña. */
+export function operador(): Actor {
+  const u = usuarioActual();
+  return u ? { nombre: u.nombre, rol: u.puesto } : { nombre: "Rodolfo Paz", rol: "Recibidor" };
+}
 export const SISTEMA: Actor = { nombre: "Sistema", rol: "Alerta automática" };
 
 export const ESTADO_TEXTO: Record<EstadoIncidencia, { texto: string; clase: string }> = {
@@ -279,7 +284,7 @@ export const ROL_DECISOR: Record<Decisor, "supervisor" | "calidad" | "compras"> 
   area: "supervisor",
 };
 
-export function crearIncidencia({ registradaPor = OPERADOR, ...datos }: NuevaIncidencia): Incidencia {
+export function crearIncidencia({ registradaPor = operador(), ...datos }: NuevaIncidencia): Incidencia {
   const id = nuevoId();
   const estado = datos.estado ?? "pendiente";
   const pendiente = estado === "pendiente";
@@ -570,7 +575,7 @@ export function anularIncidencias(ids: string[], motivo: string) {
             estado: "anulada",
             resolucion: `Anulada: ${motivo}.`,
             resueltaEn: Date.now(),
-            eventos: [...(x.eventos ?? []), evento("anulada", OPERADOR, `Anulada: ${motivo}`)],
+            eventos: [...(x.eventos ?? []), evento("anulada", operador(), `Anulada: ${motivo}`)],
           }
         : x,
     ),
@@ -594,7 +599,7 @@ export function cerrarIncidencia(id: string, actor: Actor, texto: string) {
 }
 
 /** El conteo en la tarea Contar cierra la incidencia que bloqueó la posición. */
-export function resolverPorConteo(id: string, resolucion: string, contador = "Rodolfo Paz") {
+export function resolverPorConteo(id: string, resolucion: string, contador = operador().nombre) {
   const i = incidenciasStore.get().find((x) => x.id === id);
   if (!i) return;
   if (i.posicion) liberarPosicion(i.posicion);

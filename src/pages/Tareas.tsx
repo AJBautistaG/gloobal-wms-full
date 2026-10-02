@@ -1,5 +1,7 @@
 import { FechaHoy } from "@/lib/fecha";
 import { Link } from "react-router-dom";
+import { PrimerNombre } from "@/components/PrimerNombre";
+import { permitido, useSesion } from "@/lib/sesion";
 import { ChevronRight, Monitor, Moon, RotateCcw, Sun } from "lucide-react";
 import { esPendiente, incidenciasStore } from "@/data/incidencias";
 import { toast } from "sonner";
@@ -14,7 +16,8 @@ import { reiniciarStores } from "@/lib/store";
 /** Menú de tareas de piso, filtrado por el rol elegido en el encabezado. */
 export default function Tareas() {
   const { rol, oscuro, setOscuro } = usePda();
-  const visibles = TAREAS.filter((t) => t.roles.includes(rol));
+  const sesion = useSesion();
+  const visibles = TAREAS.filter((t) => t.roles.includes(rol) && permitido(sesion, t.ruta.split("?")[0], new URLSearchParams(t.ruta.split("?")[1] ?? "").get("area")));
   const etiquetaRol = ROLES.find((r) => r.id === rol)?.etiqueta;
   const porAcomodar = leerBultos().length;
   const revisiones = tareasConteoStore.use().filter((x) => x.estado === "pendiente").length;
@@ -36,7 +39,7 @@ export default function Tareas() {
     <div className="flex flex-col gap-3">
       <div>
         <p className="text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase"><FechaHoy /></p>
-        <h2 className="mt-1 font-display text-2xl font-extrabold">Buenos días, Rodolfo</h2>
+        <h2 className="mt-1 font-display text-2xl font-extrabold">Buenos días, <PrimerNombre /></h2>
         <p className="text-sm text-muted-foreground">
           {visibles.length} tareas para {etiquetaRol?.toLowerCase()}. Cambia el rol arriba para ver otras.
         </p>

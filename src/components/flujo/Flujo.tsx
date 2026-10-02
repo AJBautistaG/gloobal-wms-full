@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Check, ChevronLeft, ChevronRight, Minus, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePda } from "@/context/PdaContext";
+import { tareasDe, useSesion } from "@/lib/sesion";
 
 /** Pantalla completa con contenido desplazable y los botones siempre al alcance del pulgar. */
 export function Marco({ children, boton, oscuro = false }: { children: ReactNode; boton: ReactNode; oscuro?: boolean }) {
@@ -343,30 +344,31 @@ export function Contador({
 }
 
 /** "Rodolfo Paz · [Recibidor ▾]": cambia de tarea sin salir de la pantalla completa. */
+const SALIR = "__salir";
+
 export function SelectorTarea({ actual, nombre }: { actual: string; nombre?: string }) {
   const navegar = useNavigate();
   const { usuario } = usePda();
+  const sesion = useSesion();
   return (
     <label className="mt-1 inline-flex items-center gap-1 text-sm text-muted-foreground">
       {nombre ?? usuario} ·
       <select
         aria-label="Cambiar de tarea"
         value={actual}
-        onChange={(e) => navegar(e.target.value)}
+        onChange={(e) => {
+          if (e.target.value === SALIR) {
+            navegar("/login?salir=1", { replace: true });
+          } else navegar(e.target.value);
+        }}
         className="bg-transparent font-semibold text-foreground"
       >
-        <option value="/pda/recibir">Recibidor</option>
-        <option value="/pda/acomodar">Acomodador</option>
-        <option value="/pda/surtir">Surtidor</option>
-        <option value="/pda/contar">Conteo</option>
-        <option value="/pda/tienda">Tienda</option>
-        <option value="/pda/supervisor">Supervisor</option>
-        <optgroup label="Área">
-          <option value="/pda/area?area=panaderia">Panadería</option>
-          <option value="/pda/area?area=cocina">Cocina</option>
-          <option value="/pda/area?area=dulceria">Dulcería</option>
-        </optgroup>
-        <option value="/pda">Todas las tareas</option>
+        {tareasDe(sesion).map((t) => (
+          <option key={t.ruta} value={t.ruta}>
+            {t.nombre}
+          </option>
+        ))}
+        <option value={SALIR}>Cerrar sesión</option>
       </select>
     </label>
   );

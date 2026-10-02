@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useSesion } from "@/lib/sesion";
 import { toast } from "sonner";
-import { ArrowLeft, Bell, Check, ClipboardList, FileText, Minus, Moon, Plus, Search, Smartphone, Sun, Truck, X } from "lucide-react";
+import { ArrowLeft, Bell, Check, ClipboardList, FileText, LogOut, Minus, Moon, Plus, Search, Smartphone, Sun, Truck, X } from "lucide-react";
 import { ImagenProducto } from "@/components/ui/ImagenProducto";
 import { usePda } from "@/context/PdaContext";
 import {
@@ -251,6 +252,9 @@ function Campana({ avisos }: { avisos: Aviso[] }) {
 function Escritorio({ a }: { a: Area }) {
   const { oscuro, setOscuro } = usePda();
   const [, setParams] = useSearchParams();
+  const sesion = useSesion();
+  const navegar = useNavigate();
+  const yo = sesion ?? { nombre: a.pide, puesto: `Jefe de ${a.nombre}`, perfil: "area_jefe" as const };
   const estados = surtidoStore.use();
   const pedidos = pedidosAreaStore.use();
   const incidencias = incidenciasStore.use();
@@ -284,6 +288,9 @@ function Escritorio({ a }: { a: Area }) {
               </p>
             </div>
           </div>
+          {yo.perfil !== "supervisor" ? (
+            <span className="rounded-xl border border-border px-3 py-1.5 text-sm font-semibold">{a.nombre}</span>
+          ) : (
           <label className="flex items-center gap-2 rounded-xl border border-border px-3 py-1.5 text-sm">
             <span className="text-muted-foreground">Área</span>
             <select
@@ -299,6 +306,7 @@ function Escritorio({ a }: { a: Area }) {
               ))}
             </select>
           </label>
+          )}
           <span className="rounded-full bg-primary-soft px-3 py-1 text-xs font-semibold text-primary">Maqueta con datos de ejemplo</span>
           <div className="ml-auto flex items-center gap-2">
             <Link to={`/pda/area?area=${a.clave}`} target="_blank" className={SECUNDARIO}>
@@ -309,12 +317,23 @@ function Escritorio({ a }: { a: Area }) {
             </button>
             <Campana avisos={avisos} />
             <div className="hidden items-center gap-2 pl-2 sm:flex">
-              <span className="grid size-10 place-items-center rounded-full bg-muted text-sm font-bold">{a.pide.split(" ").map((p) => p[0]).join("")}</span>
+              <span className="grid size-10 place-items-center rounded-full bg-muted text-sm font-bold">{yo.nombre.split(" ").map((p) => p[0]).join("").slice(0, 2)}</span>
               <div className="text-sm leading-tight">
-                <p className="font-semibold">{a.pide}</p>
-                <p className="text-xs text-muted-foreground">{a.nombre}</p>
+                <p className="font-semibold">{yo.nombre}</p>
+                <p className="text-xs text-muted-foreground">{yo.puesto}</p>
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                navegar("/login?salir=1", { replace: true });
+              }}
+              aria-label="Cerrar sesión"
+              title="Cerrar sesión"
+              className="grid size-11 place-items-center rounded-full border border-border bg-card"
+            >
+              <LogOut size={18} aria-hidden />
+            </button>
           </div>
         </div>
         <nav className="mx-auto flex max-w-[1440px] gap-1 px-6" aria-label="Secciones del área">

@@ -1,3 +1,4 @@
+import { PrimerNombre } from "@/components/PrimerNombre";
 import { FechaHoy } from "@/lib/fecha";
 import { useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
@@ -897,7 +898,7 @@ export default function Recibir() {
     return pantalla(
       <>
         <p className="text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase"><FechaHoy /></p>
-        <h1 className="mt-1 font-display text-3xl font-extrabold">Buenos días, Rodolfo</h1>
+        <h1 className="mt-1 font-display text-3xl font-extrabold">Buenos días, <PrimerNombre /></h1>
         <SelectorTarea actual="/pda/recibir" />
         <button
           type="button"

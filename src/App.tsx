@@ -13,6 +13,9 @@ import SupervisorMovil from "@/pages/supervisor/SupervisorMovil";
 import SupervisorDesktop from "@/pages/supervisor/SupervisorDesktop";
 import Area from "@/pages/area/Area";
 import AreaEscritorio from "@/pages/area/AreaEscritorio";
+import Login from "@/pages/Login";
+import { Inicio, Protegida } from "@/components/Protegida";
+
 export default function App() {
   const { oscuro } = usePda();
   const { pathname } = useLocation();
@@ -37,8 +40,16 @@ export default function App() {
 function Rutas() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/pda" replace />} />
-      <Route path="/pda" element={<PdaLayout />}>
+      <Route path="/" element={<Inicio />} />
+      <Route path="/login" element={<Login />} />
+      <Route
+        path="/pda"
+        element={
+          <Protegida>
+            <PdaLayout />
+          </Protegida>
+        }
+      >
         <Route index element={<Tareas />} />
         <Route path="recibir" element={<Recibir />} />
         <Route path="acomodar" element={<Acomodar />} />
@@ -51,9 +62,23 @@ function Rutas() {
         <Route path="supervisor" element={<SupervisorMovil />} />
         <Route path="area" element={<Area />} />
       </Route>
-      <Route path="/supervisor" element={<SupervisorDesktop />} />
-      <Route path="/area" element={<AreaEscritorio />} />
-      <Route path="*" element={<Navigate to="/pda" replace />} />
+      <Route
+        path="/supervisor"
+        element={
+          <Protegida>
+            <SupervisorDesktop />
+          </Protegida>
+        }
+      />
+      <Route
+        path="/area"
+        element={
+          <Protegida>
+            <AreaEscritorio />
+          </Protegida>
+        }
+      />
+      <Route path="*" element={<Inicio />} />
     </Routes>
   );
 }

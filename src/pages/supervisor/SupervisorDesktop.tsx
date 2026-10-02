@@ -1,7 +1,8 @@
 import { FechaHoy } from "@/lib/fecha";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
-import { CircleAlert, CircleCheck, Clock, FileText, Moon, Smartphone, Sun, TriangleAlert } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { useSesion } from "@/lib/sesion";
+import { CircleAlert, CircleCheck, Clock, FileText, LogOut, Moon, Smartphone, Sun, TriangleAlert } from "lucide-react";
 import { EstadoChip, useAvisosEnVivo } from "@/components/incidencias/Avisos";
 import { usePda } from "@/context/PdaContext";
 import { DECISOR, SEMAFORO, SUPERVISOR, esPendiente, incidenciasStore, procesoDe, type Incidencia } from "@/data/incidencias";
@@ -242,6 +243,9 @@ function Bandeja({ lista, seleccion, onElegir, ahora }: { lista: Incidencia[]; s
 /** Torre de control del supervisor: monitoreo en vivo, bandeja de excepciones y trazabilidad. */
 export default function SupervisorDesktop() {
   const { oscuro, setOscuro } = usePda();
+  const sesion = useSesion();
+  const navegar = useNavigate();
+  const yo = sesion ?? { nombre: SUPERVISOR.nombre, puesto: SUPERVISOR.rol };
   const incidencias = incidenciasStore.use();
   const umbrales = umbralesStore.use();
   const { metricas: m, ahora } = useMetricas();
@@ -319,12 +323,23 @@ export default function SupervisorDesktop() {
               }}
             />
             <div className="hidden items-center gap-2 pl-2 sm:flex">
-              <span className="grid size-10 place-items-center rounded-full bg-muted text-sm font-bold">RV</span>
+              <span className="grid size-10 place-items-center rounded-full bg-muted text-sm font-bold">{yo.nombre.split(" ").map((p) => p[0]).join("").slice(0, 2)}</span>
               <div className="text-sm leading-tight">
-                <p className="font-semibold">{SUPERVISOR.nombre}</p>
-                <p className="text-xs text-muted-foreground">{SUPERVISOR.rol}</p>
+                <p className="font-semibold">{yo.nombre}</p>
+                <p className="text-xs text-muted-foreground">{yo.puesto}</p>
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                navegar("/login?salir=1", { replace: true });
+              }}
+              aria-label="Cerrar sesión"
+              title="Cerrar sesión"
+              className="grid size-11 place-items-center rounded-full border border-border bg-card"
+            >
+              <LogOut size={18} aria-hidden />
+            </button>
           </div>
         </div>
       </header>

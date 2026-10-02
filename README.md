@@ -12,6 +12,14 @@ npm run dev        # http://localhost:5173/pda
 npm run build      # revisa tipos y genera dist/
 ```
 
+## Entrar (inicio de sesión simulado)
+
+Todo pide sesión: `/login` lista a los usuarios de piso y de escritorio, y el PIN de la maqueta es `1234`. Cada
+usuario entra a su pantalla y solo ve sus tareas; si abre una pantalla de otro perfil, ve "No tienes acceso". La
+supervisora (Rosa Villalaz) puede entrar a todo. La sesión es por pestaña (`sessionStorage`): se puede tener a un
+usuario en cada pestaña compartiendo los mismos datos. Las incidencias quedan registradas con el nombre de quien
+inició sesión. Usuarios en `src/lib/sesion.ts`.
+
 ## Despliegue (Vercel)
 
 El repositorio incluye `vercel.json`: Vercel detecta Vite, compila con `npm run build`, publica `dist/` y responde

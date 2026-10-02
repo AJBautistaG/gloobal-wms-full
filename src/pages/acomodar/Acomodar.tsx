@@ -1,3 +1,4 @@
+import { PrimerNombre } from "@/components/PrimerNombre";
 import { FechaHoy } from "@/lib/fecha";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
@@ -456,7 +457,7 @@ export default function Acomodar() {
   const encabezado = (
     <>
       <p className="text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase"><FechaHoy /></p>
-      <h1 className="mt-1 font-display text-3xl font-extrabold">Buenos días, Rodolfo</h1>
+      <h1 className="mt-1 font-display text-3xl font-extrabold">Buenos días, <PrimerNombre /></h1>
       <SelectorTarea actual="/pda/acomodar" />
     </>
   );
