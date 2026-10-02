@@ -68,12 +68,7 @@ export default function Login() {
       <aside className="relative hidden overflow-hidden bg-[#c5005a] p-12 text-white lg:flex lg:flex-col lg:justify-between">
         {/* Logotipo en blanco sobre el rosa de la marca */}
         <img src="/momi-logo.png" alt="Momi" className="h-12 w-auto self-start brightness-0 invert" />
-        <div>
-          <p className="font-display text-5xl leading-tight font-extrabold text-balance">Cada movimiento construye momentos felices.</p>
-          <p className="mt-5 max-w-md text-lg text-white/85">
-            Del andén a la vitrina: cada insumo que recibimos, acomodamos y surtimos termina en un pastel, un pan o un detalle que alguien va a disfrutar.
-          </p>
-        </div>
+        <p className="font-display text-5xl leading-tight font-extrabold text-balance">Cada movimiento construye momentos felices.</p>
         <p className="text-sm text-white/70">Dulcería Momi, S.A. · Panamá</p>
       </aside>
 
