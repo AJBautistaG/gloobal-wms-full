@@ -11,6 +11,8 @@ export type ClaveAreaSesion = "panaderia" | "cocina" | "dulceria";
 export interface Usuario {
   id: string;
   nombre: string;
+  /** Correo con el que inicia sesión (dominio de pruebas). */
+  correo: string;
   perfil: Perfil;
   /** Cómo se presenta: "Recibidor", "Jefe de Panadería"… */
   puesto: string;
@@ -21,22 +23,31 @@ export interface Usuario {
   proximamente?: boolean;
 }
 
-export const PIN_DEMO = "1234";
+/** Contraseña de la maqueta, igual para todos. No es seguridad real: no hay servidor. */
+export const CONTRASENA_DEMO = "Momi2026";
+
+/** Valida correo y contraseña contra los usuarios de la maqueta. */
+export function validar(correo: string, contrasena: string): { usuario: Usuario } | { error: string } {
+  const u = USUARIOS.find((x) => x.correo === correo.trim().toLowerCase());
+  if (!u || contrasena !== CONTRASENA_DEMO) return { error: "Correo o contraseña incorrectos." };
+  if (u.proximamente) return { error: `Tu perfil (${u.puesto}) todavía no tiene pantalla en la maqueta.` };
+  return { usuario: u };
+}
 
 export const USUARIOS: Usuario[] = [
-  { id: "rodolfo", nombre: "Rodolfo Paz", perfil: "recibidor", puesto: "Recibidor", inicio: "/pda/recibir", grupo: "Piso (PDA)" },
-  { id: "abdiel", nombre: "Abdiel Serrano", perfil: "acomodador", puesto: "Acomodador", inicio: "/pda/acomodar", grupo: "Piso (PDA)" },
-  { id: "luis", nombre: "Luis Ortega", perfil: "surtidor", puesto: "Surtidor", inicio: "/pda/surtir", grupo: "Piso (PDA)" },
-  { id: "irene", nombre: "Irene Castillo", perfil: "tienda", puesto: "Encargada de tienda", inicio: "/pda/tienda", grupo: "Piso (PDA)" },
-  { id: "jose", nombre: "José Pinzón", perfil: "area_recibe", puesto: "Recibe en Panadería", area: "panaderia", inicio: "/pda/area?area=panaderia", grupo: "Piso (PDA)" },
-  { id: "delia", nombre: "Delia Castillo", perfil: "area_recibe", puesto: "Recibe en Cocina", area: "cocina", inicio: "/pda/area?area=cocina", grupo: "Piso (PDA)" },
-  { id: "ana", nombre: "Ana Rodríguez", perfil: "area_recibe", puesto: "Recibe en Dulcería", area: "dulceria", inicio: "/pda/area?area=dulceria", grupo: "Piso (PDA)" },
-  { id: "rosa", nombre: "Rosa Villalaz", perfil: "supervisor", puesto: "Supervisora de almacén", inicio: "/supervisor", grupo: "Escritorio" },
-  { id: "carlos", nombre: "Carlos Méndez", perfil: "area_jefe", puesto: "Jefe de Panadería", area: "panaderia", inicio: "/area?area=panaderia", grupo: "Escritorio" },
-  { id: "ruben", nombre: "Rubén Araúz", perfil: "area_jefe", puesto: "Jefe de Cocina", area: "cocina", inicio: "/area?area=cocina", grupo: "Escritorio" },
-  { id: "maria", nombre: "María Cedeño", perfil: "area_jefe", puesto: "Jefa de Dulcería", area: "dulceria", inicio: "/area?area=dulceria", grupo: "Escritorio" },
-  { id: "marisol", nombre: "Marisol Quintero", perfil: "calidad", puesto: "Calidad", inicio: "/supervisor", grupo: "Escritorio", proximamente: true },
-  { id: "katia", nombre: "Ana Batista", perfil: "compras", puesto: "Compras", inicio: "/supervisor", grupo: "Escritorio", proximamente: true },
+  { id: "rodolfo", nombre: "Rodolfo Paz", correo: "rodolfo.paz@momi.test", perfil: "recibidor", puesto: "Recibidor", inicio: "/pda/recibir", grupo: "Piso (PDA)" },
+  { id: "abdiel", nombre: "Abdiel Serrano", correo: "abdiel.serrano@momi.test", perfil: "acomodador", puesto: "Acomodador", inicio: "/pda/acomodar", grupo: "Piso (PDA)" },
+  { id: "luis", nombre: "Luis Ortega", correo: "luis.ortega@momi.test", perfil: "surtidor", puesto: "Surtidor", inicio: "/pda/surtir", grupo: "Piso (PDA)" },
+  { id: "irene", nombre: "Irene Castillo", correo: "irene.castillo@momi.test", perfil: "tienda", puesto: "Encargada de tienda", inicio: "/pda/tienda", grupo: "Piso (PDA)" },
+  { id: "jose", nombre: "José Pinzón", correo: "jose.pinzon@momi.test", perfil: "area_recibe", puesto: "Recibe en Panadería", area: "panaderia", inicio: "/pda/area?area=panaderia", grupo: "Piso (PDA)" },
+  { id: "delia", nombre: "Delia Castillo", correo: "delia.castillo@momi.test", perfil: "area_recibe", puesto: "Recibe en Cocina", area: "cocina", inicio: "/pda/area?area=cocina", grupo: "Piso (PDA)" },
+  { id: "ana", nombre: "Ana Rodríguez", correo: "ana.rodriguez@momi.test", perfil: "area_recibe", puesto: "Recibe en Dulcería", area: "dulceria", inicio: "/pda/area?area=dulceria", grupo: "Piso (PDA)" },
+  { id: "rosa", nombre: "Rosa Villalaz", correo: "rosa.villalaz@momi.test", perfil: "supervisor", puesto: "Supervisora de almacén", inicio: "/supervisor", grupo: "Escritorio" },
+  { id: "carlos", nombre: "Carlos Méndez", correo: "carlos.mendez@momi.test", perfil: "area_jefe", puesto: "Jefe de Panadería", area: "panaderia", inicio: "/area?area=panaderia", grupo: "Escritorio" },
+  { id: "ruben", nombre: "Rubén Araúz", correo: "ruben.arauz@momi.test", perfil: "area_jefe", puesto: "Jefe de Cocina", area: "cocina", inicio: "/area?area=cocina", grupo: "Escritorio" },
+  { id: "maria", nombre: "María Cedeño", correo: "maria.cedeno@momi.test", perfil: "area_jefe", puesto: "Jefa de Dulcería", area: "dulceria", inicio: "/area?area=dulceria", grupo: "Escritorio" },
+  { id: "marisol", nombre: "Marisol Quintero", correo: "marisol.quintero@momi.test", perfil: "calidad", puesto: "Calidad", inicio: "/supervisor", grupo: "Escritorio", proximamente: true },
+  { id: "katia", nombre: "Ana Batista", correo: "ana.batista@momi.test", perfil: "compras", puesto: "Compras", inicio: "/supervisor", grupo: "Escritorio", proximamente: true },
 ];
 
 /** Tareas del PDA que ve cada perfil (además del menú `/pda`). */

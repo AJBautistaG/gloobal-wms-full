@@ -12,13 +12,22 @@ npm run dev        # http://localhost:5173/pda
 npm run build      # revisa tipos y genera dist/
 ```
 
-## Entrar (inicio de sesión simulado)
+## Iniciar sesión (simulado)
 
-Todo pide sesión: `/login` lista a los usuarios de piso y de escritorio, y el PIN de la maqueta es `1234`. Cada
-usuario entra a su pantalla y solo ve sus tareas; si abre una pantalla de otro perfil, ve "No tienes acceso". La
-supervisora (Rosa Villalaz) puede entrar a todo. La sesión es por pestaña (`sessionStorage`): se puede tener a un
-usuario en cada pestaña compartiendo los mismos datos. Las incidencias quedan registradas con el nombre de quien
-inició sesión. Usuarios en `src/lib/sesion.ts`.
+Todo pide sesión en `/login` con correo y contraseña. **Contraseña de todos: `Momi2026`.** Es una simulación: no hay
+servidor, las credenciales están en `src/lib/sesion.ts` y no protegen nada de verdad. La sesión es por pestaña
+(`sessionStorage`), cada usuario solo ve sus pantallas y las incidencias quedan con el nombre de quien entró.
+
+| Correo | Usuario | Entra a |
+| --- | --- | --- |
+| rodolfo.paz@momi.test | Recibidor | /pda/recibir |
+| abdiel.serrano@momi.test | Acomodador | /pda/acomodar |
+| luis.ortega@momi.test | Surtidor | /pda/surtir |
+| irene.castillo@momi.test | Encargada de tienda | /pda/tienda |
+| jose.pinzon@momi.test · delia.castillo@momi.test · ana.rodriguez@momi.test | Reciben en Panadería · Cocina · Dulcería | PDA de su área |
+| carlos.mendez@momi.test · ruben.arauz@momi.test · maria.cedeno@momi.test | Jefes de Panadería · Cocina · Dulcería | Escritorio de su área |
+| rosa.villalaz@momi.test | Supervisora (ve todo) | /supervisor |
+| marisol.quintero@momi.test · ana.batista@momi.test | Calidad · Compras | Próximamente |
 
 ## Despliegue (Vercel)
 
