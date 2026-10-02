@@ -2,8 +2,23 @@ import { CLAVES } from "@/lib/almacenamiento";
 import { FOLIO_DIA } from "@/lib/fecha";
 import { crearStore } from "@/lib/store";
 import { horaActual } from "@/lib/utils";
-import { crearIncidencia, esPendiente, type Incidencia } from "./incidencias";
-import { SURTIDOR, estadoDe, insumoDe, pedidosAreaStore, trabajosDelDia, type ClaveArea, type EstadoTrabajo, type Insumo, type PedidoArea, type Trabajo } from "./surtido";
+import { SUPERVISOR, crearIncidencia, esPendiente, type Incidencia } from "./incidencias";
+import { notificar } from "./notificaciones";
+import {
+  ESTADO_INICIAL,
+  SURTIDOR,
+  estadoDe,
+  insumoDe,
+  pedidosAreaStore,
+  surtidoStore,
+  trabajosDelDia,
+  type Aprobacion,
+  type ClaveArea,
+  type EstadoTrabajo,
+  type Insumo,
+  type PedidoArea,
+  type Trabajo,
+} from "./surtido";
 
 /**
  * Rol Área (Panadería, Cocina, Dulcería): pide al almacén por ventanas, sigue su pedido
@@ -47,6 +62,14 @@ export const ORIGENES = [
 ];
 
 export type Entrega = "ventana" | "urgente";
+
+/** Quién aprueba las solicitudes urgentes: rompen el orden de la cola del surtidor. */
+export const APROBADOR_URGENTE = { nombre: SUPERVISOR.nombre, puesto: "Supervisora de almacén" };
+
+/** Por qué el área necesita algo fuera de la ventana (obligatorio para pedir urgente). */
+export const MOTIVOS_URGENCIA = ["Se acabó en línea", "Pedido especial de un cliente", "Producción adicional no planeada", "Error en la planeación", "Faltó en la entrega anterior"];
+
+export const MOTIVOS_RECHAZO_URGENTE = ["Puede esperar a la ventana", "No hay existencia libre", "El surtidor no tiene capacidad ahora", "Ya va en otro pedido"];
 
 const base = (prefijo: string, n: string) => `SOL-${prefijo}-${FOLIO_DIA}-${n}`;
 
@@ -169,7 +192,7 @@ export function enviarPedido(
   a: Area,
   lineas: LineaPedido[],
   sinCodigo: SinCodigo[],
-  opciones: { recibe?: string; entrega?: Entrega; origen?: string; nota?: string; desdePlan?: boolean } = {},
+  opciones: { recibe?: string; entrega?: Entrega; origen?: string; nota?: string; desdePlan?: boolean; motivoUrgencia?: string } = {},
 ) {
   const recibe = opciones.recibe ?? a.recibe;
   const extra = { origen: opciones.origen ?? ORIGENES[0].nombre, nota: opciones.nota || undefined, desdePlan: opciones.desdePlan || undefined };
@@ -194,12 +217,26 @@ export function enviarPedido(
       pide: a.pide,
       recibe,
       lineas: urgentes.map((l) => [l.sku, l.cantidad]),
-      urgente: opciones.entrega === "urgente" ? "Solicitud urgente" : "Lo necesito antes",
+      urgente: opciones.motivoUrgencia ?? (opciones.entrega === "urgente" ? "Solicitud urgente" : "Lo necesito antes"),
       hora,
       ...extra,
     });
   }
+  // Lo urgente espera la aprobación de la supervisora antes de entrar a la cola del surtidor.
+  const urgente = nuevos.find((p) => p.sale === "ahora");
+  if (urgente) {
+    const aprobacion: Aprobacion = { solicitada: hora, solicitadaMs: Date.now(), motivo: urgente.urgente!, aprobador: APROBADOR_URGENTE.nombre };
+    surtidoStore.set((todos) => ({ ...todos, [urgente.id]: { ...ESTADO_INICIAL, estado: "por_aprobar", aprobacion } }));
+  }
   pedidosAreaStore.set((todos) => [...todos, ...nuevos]);
+  if (urgente)
+    notificar({
+      para: "supervisor",
+      incidencia: urgente.id,
+      titulo: `${a.nombre} pide una urgencia`,
+      texto: `${urgente.pide} · ${urgente.lineas.length} artículos · ${urgente.urgente}. Apruébala o mándala a la ventana de las ${VENTANA.sale}.`,
+      tono: "nueva",
+    });
   const solicitudes = sinCodigo.map((s) =>
     crearIncidencia({
       registradaPor: { nombre: a.pide, rol: a.nombre },
@@ -216,6 +253,46 @@ export function enviarPedido(
     }),
   );
   return { pedidos: nuevos, solicitudes };
+}
+
+export type DecisionUrgente = NonNullable<Aprobacion["decision"]>;
+
+export const TEXTO_DECISION: Record<DecisionUrgente, string> = {
+  aprobada: "aprobó la urgencia",
+  ventana: `la pasó a la ventana de las ${VENTANA.sale}`,
+  rechazada: "rechazó la urgencia",
+};
+
+/**
+ * Decide una solicitud urgente: aprobada entra arriba en la cola; "ventana" la convierte en
+ * pedido normal de las 14:00; rechazada no se surte (el área puede reenviarla en la ventana).
+ */
+export function decidirUrgente(id: string, decision: DecisionUrgente, quien: string, nota?: string, simulada = false) {
+  const e = surtidoStore.get()[id];
+  if (e?.estado !== "por_aprobar" || !e.aprobacion) return;
+  if (decision === "ventana") pasarAVentana(id);
+  const aprobacion: Aprobacion = { ...e.aprobacion, decision, hora: horaActual(), quien, nota: nota || undefined, simulada: simulada || undefined };
+  surtidoStore.set((todos) => ({ ...todos, [id]: { ...todos[id]!, estado: decision === "rechazada" ? "rechazado" : "en_cola", aprobacion } }));
+}
+
+function pasarAVentana(id: string) {
+  pedidosAreaStore.set((todos) => todos.map((p) => (p.id === id ? { ...p, sale: VENTANA.sale, llega: VENTANA.llega, urgente: undefined } : p)));
+}
+
+/** Después de un rechazo, el área la manda como pedido normal de la ventana. */
+export function reenviarEnVentana(id: string, quien: string) {
+  const e = surtidoStore.get()[id];
+  if (e?.estado !== "rechazado" || !e.aprobacion) return;
+  pasarAVentana(id);
+  surtidoStore.set((todos) => ({ ...todos, [id]: { ...todos[id]!, estado: "en_cola", aprobacion: { ...e.aprobacion!, reenviada: { hora: horaActual(), quien } } } }));
+}
+
+/** Las urgencias que esperan aprobación y las decididas hoy, para la torre. */
+export function urgenciasDelDia(estados = surtidoStore.get(), pedidos = pedidosAreaStore.get()) {
+  return pedidos
+    .map((p) => ({ p, e: estados[p.id] }))
+    .filter((x): x is { p: PedidoArea; e: EstadoTrabajo } => !!x.e?.aprobacion)
+    .sort((x, y) => y.e.aprobacion!.solicitadaMs - x.e.aprobacion!.solicitadaMs);
 }
 
 /** Los trabajos de un área, del más reciente al más antiguo. */
@@ -236,6 +313,8 @@ export interface Borrador {
   recibe: string;
   entrega: Entrega;
   nota: string;
+  /** Por qué se pide fuera de la ventana (si algo es urgente). */
+  motivoUrgencia?: string;
   guardado: string;
   /** Lo generó la planeación: se revisa antes de enviar. */
   desdePlan?: boolean;
@@ -258,7 +337,7 @@ export function descartarBorrador(a: Area) {
 
 export function metricasArea(a: Area, trabajos: Trabajo[], estados: Record<string, EstadoTrabajo>, incidencias: Incidencia[]) {
   const de = (t: Trabajo) => estadoDe(t.id, estados);
-  const activos = trabajos.filter((t) => de(t).estado !== "cancelado");
+  const activos = trabajos.filter((t) => !["cancelado", "rechazado"].includes(de(t).estado));
   const entregados = trabajos.filter((t) => de(t).estado === "confirmado");
   // Líneas resueltas por el surtidor y cuántas salieron completas (la entrega de las 07:00 cuenta completa).
   let lineas = a.entregaTemprano.lineas.length;
@@ -276,6 +355,7 @@ export function metricasArea(a: Area, trabajos: Trabajo[], estados: Record<strin
     pedidosHoy: activos.length + 1,
     enCamino: trabajos.filter((t) => de(t).estado === "transito").length,
     porSurtir: trabajos.filter((t) => ["en_cola", "surtiendo", "pausado"].includes(de(t).estado)).length,
+    porAprobar: trabajos.filter((t) => de(t).estado === "por_aprobar").length,
     entregados: entregados.length + 1,
     conformes: entregados.filter((t) => !de(t).confirmado?.diferencia).length + 1,
     lineasCompletas: lineas ? Math.round((completas / lineas) * 100) : 100,

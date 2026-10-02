@@ -14,6 +14,7 @@ import { cn, cuenta } from "@/lib/utils";
 import { VisorOrdenesEscritorio } from "./Ordenes";
 import { ConfigVidaUtil, IndicadoresLote, PanelExistencia, VisorInventario, type Pestana } from "./Caducidad";
 import { CampanaSupervisor, DetalleIncidencia, TareasInventario, quienDecide } from "./Piezas";
+import { UrgenciasPorAprobar, useUrgenciasPendientes } from "./Urgencias";
 
 // ── Piezas del tablero ───────────────────────────────────────────
 
@@ -140,6 +141,8 @@ function GraficaPorTipo({ datos }: { datos: { texto: string; n: number }[] }) {
 }
 
 const ESTADO_SURTIDO: Record<string, { texto: string; clase: string }> = {
+  por_aprobar: { texto: "Por aprobar", clase: "bg-alerta/15 text-alerta" },
+  rechazado: { texto: "Urgencia rechazada", clase: "bg-critico/15 text-critico" },
   en_cola: { texto: "En cola", clase: "bg-muted text-muted-foreground" },
   surtiendo: { texto: "Surtiendo", clase: "bg-primary-soft text-primary" },
   pausado: { texto: "En pausa", clase: "bg-alerta/15 text-alerta" },
@@ -256,6 +259,7 @@ export default function SupervisorDesktop() {
   const cerrarOrdenes = useCallback(() => setVerOrdenes(false), []);
   const [verInventario, setVerInventario] = useState<Pestana | null>(null);
   const cerrarInventario = useCallback(() => setVerInventario(null), []);
+  const urgencias = useUrgenciasPendientes();
   useAvisosEnVivo(["supervisor"]);
   useVigilanciaTransito();
 
@@ -328,6 +332,11 @@ export default function SupervisorDesktop() {
             <CampanaSupervisor
               variante="menu"
               onAbrir={(id) => {
+                // Las urgencias de las áreas no son incidencias: se deciden en su propio panel.
+                if (id.startsWith("SOL-")) {
+                  document.getElementById("urgencias")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  return;
+                }
                 setFiltro({ proceso: "todos", semaforo: "todos", decide: "todos", estado: "todas" });
                 setSeleccion(id);
                 document.getElementById("bandeja")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -403,6 +412,17 @@ export default function SupervisorDesktop() {
             ))}
           </div>
         </Panel>
+
+        <div id="urgencias" className="scroll-mt-24 lg:col-span-12">
+          <Panel
+            titulo="Urgencias de las áreas"
+            subtitulo={`Las solicitudes urgentes no entran a la cola del surtidor hasta que las apruebes`}
+            className={cn(urgencias > 0 && "border-alerta/60")}
+            accion={urgencias > 0 ? <span className="rounded-full bg-alerta/15 px-2.5 py-1 text-xs font-semibold text-alerta">{cuenta(urgencias, "por aprobar", "por aprobar")}</span> : undefined}
+          >
+            <UrgenciasPorAprobar quien={yo.nombre} ahora={ahora} />
+          </Panel>
+        </div>
 
         <Panel titulo="Surtido" subtitulo="Pedidos de áreas y rutas, por hora de salida" className="lg:col-span-12">
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">

@@ -239,7 +239,7 @@ export function enCaminoDe(a: Area, estados = surtidoStore.get(), pedidos = pedi
   const total = new Map<string, number>();
   for (const t of trabajosDelArea(a, pedidos)) {
     const e = estadoDe(t.id, estados);
-    if (["confirmado", "cancelado"].includes(e.estado)) continue;
+    if (["confirmado", "cancelado", "rechazado"].includes(e.estado)) continue;
     for (const l of t.lineas) total.set(l.sku, (total.get(l.sku) ?? 0) + l.pidio);
   }
   return total;

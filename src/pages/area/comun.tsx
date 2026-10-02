@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { Check, Minus, Plus } from "lucide-react";
 import { BotonFlujo, BotonSecundario, Tarjeta } from "@/components/flujo/Flujo";
-import { SIN_CODIGO_FRECUENTES, folioTemprano, pedidoDe, type Area, type SinCodigo } from "@/data/area";
+import { APROBADOR_URGENTE, SIN_CODIGO_FRECUENTES, TEXTO_DECISION, folioTemprano, pedidoDe, type Area, type SinCodigo } from "@/data/area";
 import { ELEVADOR, SURTIDOR, cantidadCon, equivalente, insumoDe, type EstadoTrabajo, type Trabajo } from "@/data/surtido";
 import { cn } from "@/lib/utils";
 
 /** Piezas compartidas por el escritorio y el PDA del área. */
 
 export const ESTADO: Record<EstadoTrabajo["estado"], { texto: string; clase: string }> = {
+  por_aprobar: { texto: "Por aprobar", clase: "bg-alerta/15 text-alerta" },
+  rechazado: { texto: "Urgencia rechazada", clase: "bg-critico/15 text-critico" },
   en_cola: { texto: "En cola", clase: "bg-muted text-muted-foreground" },
   surtiendo: { texto: "Surtiendo", clase: "bg-primary-soft text-primary" },
   pausado: { texto: "En pausa", clase: "bg-alerta/15 text-alerta" },
@@ -30,8 +32,24 @@ export function pasosDe(a: Area, t: Trabajo, e: EstadoTrabajo): Paso[] {
   const p = pedidoDe(t.id);
   const surtidas = Object.keys(e.resultados).length;
   const salio = ["transito", "confirmado"].includes(e.estado);
+  const ap = e.aprobacion;
+  // Las urgencias pasan por la aprobación de la supervisora antes de surtirse.
+  const aprobacion: Paso[] = ap
+    ? [
+        {
+          nombre: ap.decision === "rechazada" ? "Aprobación rechazada" : "Aprobación",
+          hecho: !!ap.decision,
+          detalle: ap.decision
+            ? `${ap.hora} · ${ap.quien} ${TEXTO_DECISION[ap.decision]}${ap.nota ? `: ${ap.nota.toLowerCase()}` : ""}${ap.reenviada ? ` · ${ap.reenviada.quien} la reenvió a la ventana ${ap.reenviada.hora}` : ""}`
+            : `espera a ${ap.aprobador} (${APROBADOR_URGENTE.puesto.toLowerCase()}) desde las ${ap.solicitada}`,
+        },
+      ]
+    : t.urgente && !p
+      ? [{ nombre: "Aprobación", hecho: true, detalle: `09:31 · ${APROBADOR_URGENTE.nombre} aprobó la urgencia` }]
+      : [];
   return [
-    { nombre: "Pedido", hecho: true, detalle: `${p ? `${p.hora} · ` : ""}${p?.pide ?? a.pide} (${a.nombre})${p?.origen ? ` · a ${p.origen}` : ""}` },
+    { nombre: "Pedido", hecho: true, detalle: `${p ? `${p.hora} · ` : ""}${p?.pide ?? a.pide} (${a.nombre})${p?.origen ? ` · a ${p.origen}` : ""}${ap ? ` · urgente: ${ap.motivo.toLowerCase()}` : ""}` },
+    ...aprobacion,
     { nombre: "Surtido", hecho: salio, detalle: surtidas ? `${SURTIDOR.nombre} · ${surtidas} de ${t.lineas.length} líneas` : undefined },
     { nombre: "Cerrado", hecho: salio, detalle: salio ? `contenedor ${t.contenedor}` : undefined },
     { nombre: "Salida", hecho: salio, detalle: e.salidaMs ? `${horaDe(e.salidaMs)} · ${ELEVADOR}` : undefined },

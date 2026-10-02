@@ -193,6 +193,8 @@ export function documentoCompra(
 // ── Orden de surtido ────────────────────────────────────────────
 
 const ESTADO_SURTIDO: Record<string, DocOrden["estado"]> = {
+  por_aprobar: { texto: "Urgente · por aprobar", tono: "alerta" },
+  rechazado: { texto: "Urgencia rechazada", tono: "critico" },
   en_cola: { texto: "Por surtir", tono: "neutro" },
   surtiendo: { texto: "Surtiendo", tono: "info" },
   pausado: { texto: "En pausa", tono: "alerta" },
@@ -237,7 +239,13 @@ export function documentoSurtido(t: Trabajo, todos: ReturnType<typeof surtidoSto
     };
   });
 
+  const ap = e.aprobacion;
   const historial = [
+    ...(ap ? [{ hora: ap.solicitada, texto: `Solicitud urgente: ${ap.motivo.toLowerCase()} · espera aprobación de ${ap.aprobador}` }] : []),
+    ...(ap?.decision
+      ? [{ hora: ap.hora!, texto: ap.decision === "aprobada" ? `${ap.quien} aprobó la urgencia` : ap.decision === "ventana" ? `${ap.quien} la pasó a la ventana de las ${t.sale}` : `${ap.quien} rechazó la urgencia${ap.nota ? `: ${ap.nota.toLowerCase()}` : ""}` }]
+      : []),
+    ...(ap?.reenviada ? [{ hora: ap.reenviada.hora, texto: `${ap.reenviada.quien} la reenvió en la ventana de las ${t.sale}` }] : []),
     ...(e.salidaMs ? [{ hora: hora(e.salidaMs), texto: `Salió del almacén en contenedor ${t.contenedor}` }] : []),
     ...(e.confirmado ? [{ hora: e.confirmado.hora, texto: `${e.confirmado.quien} confirmó la recepción` }] : []),
     ...(e.estado === "cancelado" ? [{ hora: "—", texto: "El área canceló el pedido; lo tomado regresa a su posición" }] : []),
@@ -266,6 +274,16 @@ export function documentoSurtido(t: Trabajo, todos: ReturnType<typeof surtidoSto
       { etiqueta: "Contenedor", valor: t.contenedor },
       { etiqueta: "Condición", valor: frio ? "Mixta · lo refrigerado se toma al final" : "Seco · ambiente" },
       { etiqueta: "Líneas", valor: String(t.lineas.length) },
+      ...(ap
+        ? [
+            {
+              etiqueta: "Aprobación",
+              valor: ap.decision
+                ? `${ap.decision === "rechazada" ? "Rechazada" : ap.decision === "ventana" ? "Pasada a la ventana" : "Aprobada"} · ${ap.quien} · ${ap.hora}`
+                : `Pendiente · ${ap.aprobador}`,
+            },
+          ]
+        : []),
       ...(p?.nota ? [{ etiqueta: "Nota para el almacén", valor: p.nota }] : []),
     ],
     lineas,

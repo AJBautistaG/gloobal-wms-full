@@ -90,7 +90,10 @@ export function confirmarEntregaArea(id: string, quien: string, causaDiferencia?
 /** El área cancela un pedido que todavía no sale; el surtidor devuelve lo que ya tomó. */
 export function cancelarDesdeArea(id: string, quien: string, motivo: string) {
   const t = trabajoDe(id);
+  const porAprobar = surtidoStore.get()[id]?.estado === "por_aprobar";
   cancelarPedidoArea(id, { hora: horaActual(), quien, motivo });
+  // Si aún esperaba aprobación, el surtidor nunca lo vio: no hay nada que devolver.
+  if (porAprobar) return;
   notificar({ para: "operador", incidencia: t.contenedor, titulo: `${t.nombre} canceló ${t.corto.split(" · ")[1] ?? t.id}`, texto: `${motivo}. Devuelve lo que ya tomaste a su posición.`, tono: "anulada" });
 }
 

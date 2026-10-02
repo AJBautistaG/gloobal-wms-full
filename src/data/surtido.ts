@@ -249,8 +249,26 @@ export interface Apartada {
   loteNuevo: string;
 }
 
+/** Una solicitud urgente no entra a la cola hasta que la aprueba la supervisora de almacén. */
+export interface Aprobacion {
+  /** Hora en que el área la pidió. */
+  solicitada: string;
+  solicitadaMs: number;
+  motivo: string;
+  aprobador: string;
+  decision?: "aprobada" | "ventana" | "rechazada";
+  hora?: string;
+  quien?: string;
+  nota?: string;
+  /** La decisión se simuló desde la vista del área (maqueta). */
+  simulada?: boolean;
+  /** El área la volvió a mandar en la ventana después del rechazo. */
+  reenviada?: { hora: string; quien: string };
+}
+
 export interface EstadoTrabajo {
-  estado: "en_cola" | "surtiendo" | "pausado" | "transito" | "confirmado" | "cancelado";
+  estado: "por_aprobar" | "rechazado" | "en_cola" | "surtiendo" | "pausado" | "transito" | "confirmado" | "cancelado";
+  aprobacion?: Aprobacion;
   linea: number;
   tomados: { nombre: string; posicion: string; bultos: string }[];
   resultados: Record<string, Resultado>;

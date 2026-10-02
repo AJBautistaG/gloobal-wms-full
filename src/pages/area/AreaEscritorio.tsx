@@ -2,13 +2,17 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useSesion } from "@/lib/sesion";
 import { toast } from "sonner";
-import { ArrowLeft, Bell, Check, ClipboardList, FileText, LogOut, Minus, Moon, Plus, Search, Smartphone, Sun, Truck, X } from "lucide-react";
+import { ArrowLeft, Bell, Check, ClipboardList, FileText, Hourglass, LogOut, Minus, Moon, Plus, Search, ShieldCheck, Smartphone, Sun, Truck, X } from "lucide-react";
 import { ImagenProducto } from "@/components/ui/ImagenProducto";
 import { usePda } from "@/context/PdaContext";
 import {
+  APROBADOR_URGENTE,
   AREAS,
   CATEGORIAS,
+  MOTIVOS_RECHAZO_URGENTE,
+  MOTIVOS_URGENCIA,
   ORIGENES,
+  TEXTO_DECISION,
   VENTANA,
   borradoresStore,
   descartarBorrador,
@@ -21,6 +25,8 @@ import {
   metricasArea,
   pasoDe,
   pedidoDe,
+  decidirUrgente,
+  reenviarEnVentana,
   trabajosDelArea,
   type Area,
   type Borrador,
@@ -187,6 +193,14 @@ function avisosDe(a: Area, trabajos: Trabajo[], estados: Record<string, EstadoTr
         avisos.push({ id: `${l.id}-${r.tipo}`, texto: `${insumoDe(l.sku).nombre} (${t.id}) quedó ${r.tipo === "parcial" ? "parcial" : "pendiente con fecha"}: ${r.causa ?? "sin existencia"}${productosQueUsan(a.clave, l.sku).length ? `. Afecta tu plan: ${productosQueUsan(a.clave, l.sku).join(", ").toLowerCase()}` : ""}`, tono: "alerta" });
       }
     }
+    const ap = e.aprobacion;
+    if (ap?.decision)
+      avisos.push({
+        id: `${t.id}-${ap.decision}`,
+        hora: ap.hora,
+        texto: `${t.id}: ${ap.quien} ${TEXTO_DECISION[ap.decision]}${ap.nota ? ` (${ap.nota.toLowerCase()})` : ""}${ap.decision === "aprobada" ? ". Ya está en la cola del surtidor." : ap.decision === "ventana" ? `. Sale a las ${VENTANA.sale}.` : ". Puedes reenviarla en la ventana."}`,
+        tono: ap.decision === "rechazada" ? "alerta" : "ok",
+      });
     if (e.estado === "transito") avisos.push({ id: `${t.id}-transito`, hora: e.salidaMs ? horaDe(e.salidaMs) : undefined, texto: `${t.id} salió del almacén. Confírmalo con el PDA al recibir el contenedor ${t.contenedor}.`, tono: "accion" });
     if (e.confirmado) avisos.push({ id: `${t.id}-confirmado`, hora: e.confirmado.hora, texto: `${t.id} entregado: recibió ${e.confirmado.quien}${e.confirmado.diferencia ? ", con diferencia" : ", conforme"}.`, tono: "ok" });
     if (e.cancelado) avisos.push({ id: `${t.id}-cancelado`, hora: e.cancelado.hora, texto: `${t.id} cancelado por ${e.cancelado.quien}: ${e.cancelado.motivo.toLowerCase()}.`, tono: "info" });
@@ -406,7 +420,7 @@ function Tablero({
   const visibles = trabajos
     .filter((t) => {
       const e = estadoDe(t.id, estados).estado;
-      return filtro === "todos" ? true : filtro === "activos" ? !["confirmado", "cancelado"].includes(e) : filtro === "entregados" ? e === "confirmado" : e === "cancelado";
+      return filtro === "todos" ? true : filtro === "activos" ? !["confirmado", "cancelado", "rechazado"].includes(e) : filtro === "entregados" ? e === "confirmado" : e === "cancelado" || e === "rechazado";
     })
     .reverse();
   const elegido = trabajos.find((t) => t.id === seleccion);
@@ -448,7 +462,7 @@ function Tablero({
       <Panel titulo={`Hoy en ${a.nombre}`} subtitulo="Tus pedidos al almacén, en vivo" className="lg:col-span-8">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
           <Indicador etiqueta="Pedidos hoy" valor={m.pedidosHoy} contexto="incluye la entrega de las 07:00" />
-          <Indicador etiqueta="Por surtir" valor={m.porSurtir} contexto={`los surte ${SURTIDOR.nombre}`} />
+          <Indicador etiqueta="Por surtir" valor={m.porSurtir} contexto={m.porAprobar ? `${m.porAprobar} urgente por aprobar` : `los surte ${SURTIDOR.nombre}`} tono={m.porAprobar ? "alerta" : undefined} />
           <Indicador etiqueta="En camino" valor={m.enCamino} contexto={m.enCamino ? "confírmalo con el PDA" : "nada en camino"} tono={m.enCamino ? "alerta" : undefined} />
           <Indicador etiqueta="Entregados" valor={m.entregados} contexto={cuenta(m.conformes, "conforme")} />
           <Indicador etiqueta="Líneas completas" valor={`${m.lineasCompletas} %`} contexto={`de ${cuenta(m.lineas, "línea")} surtidas`} tono={m.lineasCompletas < 90 ? "alerta" : "exito"} />
@@ -485,7 +499,7 @@ function Tablero({
                 ["todos", "Todos"],
                 ["activos", "Activos"],
                 ["entregados", "Entregados"],
-                ["cancelados", "Cancelados"],
+                ["cancelados", "Cancelados o rechazados"],
               ] as const
             ).map(([v, t]) => (
               <button key={v} type="button" aria-pressed={filtro === v} onClick={() => setFiltro(v)} className={cn("min-h-8 rounded-lg px-2.5 text-xs font-semibold", filtro === v ? "bg-card shadow-sm" : "text-muted-foreground")}>
@@ -621,7 +635,7 @@ function DetallePedido({ a, t, e, onHoja }: { a: Area; t: Trabajo; e: EstadoTrab
   const [cancelando, setCancelando] = useState(false);
   const [motivo, setMotivo] = useState<string | null>(null);
   const p = pedidoDe(t.id);
-  const cancelable = ["en_cola", "surtiendo", "pausado"].includes(e.estado);
+  const cancelable = ["por_aprobar", "en_cola", "surtiendo", "pausado"].includes(e.estado);
   return (
     <div className="space-y-4">
       <div>
@@ -634,6 +648,7 @@ function DetallePedido({ a, t, e, onHoja }: { a: Area; t: Trabajo; e: EstadoTrab
         </p>
         {p?.nota && <p className="mt-1 text-sm">Nota para el almacén: {p.nota}</p>}
       </div>
+      <EstadoAprobacion a={a} t={t} e={e} />
       {e.cancelado && (
         <p className="rounded-xl bg-muted px-3 py-2 text-sm">
           Lo canceló {e.cancelado.quien} a las {e.cancelado.hora}: {e.cancelado.motivo.toLowerCase()}.
@@ -702,6 +717,74 @@ function DetallePedido({ a, t, e, onHoja }: { a: Area; t: Trabajo; e: EstadoTrab
   );
 }
 
+/** Una urgencia espera a la supervisora antes de surtirse; en la maqueta se puede simular su respuesta. */
+function EstadoAprobacion({ a, t, e }: { a: Area; t: Trabajo; e: EstadoTrabajo }) {
+  const ap = e.aprobacion;
+  const [rechazando, setRechazando] = useState(false);
+  if (!ap || e.estado === "cancelado") return null;
+  if (e.estado === "por_aprobar")
+    return (
+      <div role="status" className="space-y-2 rounded-xl border border-alerta/50 bg-alerta/10 p-3 text-sm">
+        <p className="flex items-center gap-2 font-semibold text-alerta">
+          <Hourglass size={16} aria-hidden /> Espera aprobación de {ap.aprobador}
+        </p>
+        <p>
+          {APROBADOR_URGENTE.puesto} · pedida a las {ap.solicitada} · motivo: {ap.motivo.toLowerCase()}. No entra a la cola del surtidor hasta que la apruebe.
+        </p>
+        <div className="border-t border-alerta/30 pt-2">
+          <p className="mb-1.5 text-xs text-muted-foreground">Maqueta: simula la respuesta de {ap.aprobador}</p>
+          {rechazando ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {MOTIVOS_RECHAZO_URGENTE.map((m) => (
+                <Chip key={m} activo={false} onClick={() => decidirUrgente(t.id, "rechazada", ap.aprobador, m, true)}>
+                  {m}
+                </Chip>
+              ))}
+              <button type="button" onClick={() => setRechazando(false)} className="text-xs text-muted-foreground underline">
+                Volver
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => decidirUrgente(t.id, "aprobada", ap.aprobador, undefined, true)} className={cn(SECUNDARIO, "min-h-9")}>
+                <ShieldCheck size={15} aria-hidden /> Simular aprobación de {ap.aprobador}
+              </button>
+              <button type="button" onClick={() => decidirUrgente(t.id, "ventana", ap.aprobador, "Puede esperar a la ventana", true)} className={cn(SECUNDARIO, "min-h-9")}>
+                Simular que la pasa a las {VENTANA.sale}
+              </button>
+              <button type="button" onClick={() => setRechazando(true)} className={cn(SECUNDARIO, "min-h-9 text-critico")}>
+                Simular rechazo
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  if (e.estado === "rechazado")
+    return (
+      <div role="alert" className="space-y-2 rounded-xl border border-critico/50 bg-critico/10 p-3 text-sm">
+        <p className="font-semibold text-critico">
+          {ap.quien} rechazó la urgencia a las {ap.hora}
+          {ap.nota && `: ${ap.nota.toLowerCase()}`}
+        </p>
+        <p>No se surte. Si todavía lo necesitas, mándala como pedido normal de la ventana.</p>
+        <button type="button" onClick={() => reenviarEnVentana(t.id, a.pide)} className={cn(PRINCIPAL, "min-h-9")}>
+          Enviarla en la ventana de las {VENTANA.sale}
+        </button>
+      </div>
+    );
+  return (
+    <p className="flex items-center gap-2 rounded-xl bg-exito/10 px-3 py-2 text-sm">
+      <ShieldCheck size={16} className="shrink-0 text-exito" aria-hidden />
+      {ap.reenviada
+        ? `${ap.quien} rechazó la urgencia; ${ap.reenviada.quien} la reenvió en la ventana de las ${VENTANA.sale}.`
+        : ap.decision === "ventana"
+          ? `${ap.quien} la pasó a la ventana de las ${VENTANA.sale} (${ap.hora}).`
+          : `${ap.quien} aprobó la urgencia a las ${ap.hora}.`}
+    </p>
+  );
+}
+
 function DetalleTemprano({ a }: { a: Area }) {
   return (
     <div className="space-y-4">
@@ -741,6 +824,7 @@ function NuevaSolicitud({ a, borrador, onSalir, onEnviada }: { a: Area; borrador
   const [recibe, setRecibe] = useState(borrador?.recibe ?? a.recibe);
   const [entrega, setEntrega] = useState<Entrega>(borrador?.entrega ?? "ventana");
   const [nota, setNota] = useState(borrador?.nota ?? "");
+  const [motivoUrgencia, setMotivoUrgencia] = useState(borrador?.motivoUrgencia ?? "");
   const [lineas, setLineas] = useState<LineaCarrito[]>(
     () => borrador?.lineas ?? a.sugerido.map((l) => ({ sku: l.sku, cantidad: l.cantidad, antes: false, razon: l.razon, visto: l.visto, vistoDado: !l.visto })),
   );
@@ -748,9 +832,10 @@ function NuevaSolicitud({ a, borrador, onSalir, onEnviada }: { a: Area; borrador
 
   const total = lineas.length + sinCodigo.length;
   const faltanVistos = lineas.filter((l) => !l.vistoDado).length;
+  const hayUrgente = entrega === "urgente" || lineas.some((l) => l.antes);
   const cambiar = (sku: string, cambio: Partial<LineaCarrito>) => setLineas((ls) => ls.map((l) => (l.sku === sku ? { ...l, ...cambio } : l)));
   const guardar = () => {
-    guardarBorrador(a, { lineas, sinCodigo, recibe, entrega, nota, desdePlan: borrador?.desdePlan });
+    guardarBorrador(a, { lineas, sinCodigo, recibe, entrega, nota, motivoUrgencia, desdePlan: borrador?.desdePlan });
     toast.success("Borrador guardado", { description: "Lo retomas desde Mis pedidos." });
     onSalir();
   };
@@ -818,9 +903,10 @@ function NuevaSolicitud({ a, borrador, onSalir, onEnviada }: { a: Area; borrador
               </button>
               <button type="button" aria-pressed={entrega === "urgente"} onClick={() => setEntrega("urgente")} className={cn("rounded-xl border p-3 text-left", entrega === "urgente" ? "border-critico bg-critico/10" : "border-border")}>
                 <span className="block font-semibold">Urgente · sale ahora</span>
-                <span className="block text-xs text-muted-foreground">Entra arriba en la cola del surtidor</span>
+                <span className="block text-xs text-muted-foreground">Requiere aprobación de {APROBADOR_URGENTE.nombre}</span>
               </button>
             </div>
+            {entrega === "urgente" && <MotivoUrgencia valor={motivoUrgencia} onCambio={setMotivoUrgencia} />}
           </Panel>
           <Panel titulo="¿Quién lo recibe?" subtitulo="Confirma la entrega con el PDA. No puede ser quien surte.">
             <div className="flex flex-wrap gap-2">
@@ -934,6 +1020,7 @@ function NuevaSolicitud({ a, borrador, onSalir, onEnviada }: { a: Area; borrador
                 ["Pide", a.pide],
                 ["A", ORIGENES[0].nombre],
                 ["Entrega", entrega === "urgente" ? "Urgente · sale ahora" : `Ventana ${VENTANA.sale} · llega ${VENTANA.llega}`],
+                ...(hayUrgente ? [["Aprueba la urgencia", APROBADOR_URGENTE.nombre]] : []),
                 ["Recibe", recibe],
                 ["Nota", nota || "—"],
               ].map(([k, v]) => (
@@ -943,15 +1030,27 @@ function NuevaSolicitud({ a, borrador, onSalir, onEnviada }: { a: Area; borrador
                 </div>
               ))}
             </dl>
+            {hayUrgente && (
+              <div className="mt-4 rounded-xl border border-alerta/50 bg-alerta/10 p-3 text-sm">
+                <p>
+                  {entrega === "urgente" ? "La solicitud es urgente" : `${cuenta(lineas.filter((l) => l.antes).length, "línea marcada", "líneas marcadas")} "lo necesito antes" salen aparte como urgencia`}: no entra a la cola del surtidor hasta que {APROBADOR_URGENTE.nombre} la apruebe.
+                </p>
+                <MotivoUrgencia valor={motivoUrgencia} onCambio={setMotivoUrgencia} />
+              </div>
+            )}
             {faltanVistos > 0 && <p className="mt-4 rounded-xl bg-alerta/10 px-3 py-2 text-sm text-alerta">{cuenta(faltanVistos, "línea necesita tu visto", "líneas necesitan tu visto")} antes de enviar.</p>}
             <div className="mt-4 flex flex-col gap-2">
               <button
                 type="button"
-                disabled={faltanVistos > 0 || total === 0}
+                disabled={faltanVistos > 0 || total === 0 || (hayUrgente && !motivoUrgencia)}
                 onClick={() => {
-                  const r = enviarPedido(a, lineas, sinCodigo, { recibe, entrega, origen: ORIGENES[0].nombre, nota, desdePlan: borrador?.desdePlan });
+                  const r = enviarPedido(a, lineas, sinCodigo, { recibe, entrega, origen: ORIGENES[0].nombre, nota, desdePlan: borrador?.desdePlan, motivoUrgencia: hayUrgente ? motivoUrgencia : undefined });
                   descartarBorrador(a);
-                  toast.success(`Solicitud enviada a ${ORIGENES[0].nombre}`, { description: "Ya está en la cola del surtidor." });
+                  toast.success(`Solicitud enviada a ${ORIGENES[0].nombre}`, {
+                    description: hayUrgente
+                      ? `Lo urgente espera la aprobación de ${APROBADOR_URGENTE.nombre}${r.pedidos.length > 1 ? "; lo demás ya está en la cola del surtidor" : ""}.`
+                      : "Ya está en la cola del surtidor.",
+                  });
                   onEnviada(
                     r.pedidos.map((p) => p.id),
                     r.solicitudes.map((i) => i.id),
@@ -968,6 +1067,23 @@ function NuevaSolicitud({ a, borrador, onSalir, onEnviada }: { a: Area; borrador
           </Panel>
         </div>
       )}
+    </div>
+  );
+}
+
+function MotivoUrgencia({ valor, onCambio }: { valor: string; onCambio: (v: string) => void }) {
+  return (
+    <div className="mt-3">
+      <p className="mb-1.5 text-sm font-semibold">
+        ¿Por qué es urgente? <span className="font-normal text-muted-foreground">(obligatorio)</span>
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {MOTIVOS_URGENCIA.map((m) => (
+          <Chip key={m} activo={valor === m} onClick={() => onCambio(m)}>
+            {m}
+          </Chip>
+        ))}
+      </div>
     </div>
   );
 }

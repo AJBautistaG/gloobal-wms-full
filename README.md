@@ -104,6 +104,22 @@ el botón **Inventario** abre el detalle con tres pestañas: Existencias (tabla 
 Caducidad por lote (bloquear, liberar, descartar) y Merma. Hay movimientos de ejemplo de la mañana para que no
 arranque vacío; todo lo que se haga en el PDA se refleja en vivo en la torre.
 
+## Solicitudes urgentes de las áreas
+
+Pedir urgente (o marcar líneas "lo necesito antes") rompe el orden de la cola del surtidor, así que pasa por
+aprobación:
+
+1. El área elige un **motivo de urgencia** (obligatorio) y envía. El pedido queda **Por aprobar** y no entra a la
+   cola del surtidor. Lo de la ventana, si lo hay, sí entra normal.
+2. La supervisora de almacén (Rosa Villalaz) recibe el aviso y lo decide en el panel **Urgencias de las áreas** de la
+   torre, viendo el motivo y si hay existencia libre en el Central: **Aprobar · sale ahora**, **Pasar a la ventana de
+   las 14:00** o **Rechazar** (con motivo).
+3. Si se rechaza, el área puede **enviarla en la ventana de las 14:00** como pedido normal.
+
+En la maqueta, el detalle del pedido en el escritorio del área también permite **simular la respuesta** de la
+supervisora (aprobar, pasar a la ventana o rechazar). La decisión queda en el recorrido del pedido y en la hoja de
+solicitud.
+
 ## Fecha
 
 La maqueta usa la fecha real del día. Los datos de ejemplo se escribieron para el 29 de septiembre de
