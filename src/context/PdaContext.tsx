@@ -13,6 +13,7 @@ const ROL_DE: Record<Perfil, Rol> = {
   area_recibe: "area",
   calidad: "supervisor",
   compras: "supervisor",
+  direccion: "supervisor",
 };
 
 interface EstadoPda {

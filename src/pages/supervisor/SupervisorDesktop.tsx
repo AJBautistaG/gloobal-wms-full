@@ -1,6 +1,6 @@
 import { FechaHoy } from "@/lib/fecha";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useSesion } from "@/lib/sesion";
 import { Boxes, CircleAlert, CircleCheck, Clock, FileText, LogOut, Moon, Smartphone, Sun, TriangleAlert } from "lucide-react";
 import { EstadoChip, useAvisosEnVivo } from "@/components/incidencias/Avisos";
@@ -18,9 +18,9 @@ import { UrgenciasPorAprobar, useUrgenciasPendientes } from "./Urgencias";
 
 // ── Piezas del tablero ───────────────────────────────────────────
 
-function Panel({ titulo, subtitulo, children, className, accion }: { titulo: string; subtitulo?: string; children: ReactNode; className?: string; accion?: ReactNode }) {
+function Panel({ id, titulo, subtitulo, children, className, accion }: { id?: string; titulo: string; subtitulo?: string; children: ReactNode; className?: string; accion?: ReactNode }) {
   return (
-    <section className={cn("rounded-2xl border border-border bg-card p-5", className)}>
+    <section id={id} className={cn("rounded-2xl border border-border bg-card p-5", className)}>
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <h2 className="font-display text-base font-extrabold">{titulo}</h2>
@@ -260,6 +260,15 @@ export default function SupervisorDesktop() {
   const [verInventario, setVerInventario] = useState<Pestana | null>(null);
   const cerrarInventario = useCallback(() => setVerInventario(null), []);
   const urgencias = useUrgenciasPendientes();
+  // Los enlaces de Dirección abren directo el visor o la sección: ?ver=caducidad|inventario|merma|ordenes|surtido|urgencias
+  const [params] = useSearchParams();
+  useEffect(() => {
+    const ver = params.get("ver");
+    if (ver === "caducidad" || ver === "merma") setVerInventario(ver);
+    else if (ver === "inventario") setVerInventario("existencias");
+    else if (ver === "ordenes") setVerOrdenes(true);
+    else if (ver) setTimeout(() => document.getElementById(ver)?.scrollIntoView({ block: "start" }), 300);
+  }, [params]);
   useAvisosEnVivo(["supervisor"]);
   useVigilanciaTransito();
 
@@ -424,7 +433,7 @@ export default function SupervisorDesktop() {
           </Panel>
         </div>
 
-        <Panel titulo="Surtido" subtitulo="Pedidos de áreas y rutas, por hora de salida" className="lg:col-span-12">
+        <Panel id="surtido" titulo="Surtido" subtitulo="Pedidos de áreas y rutas, por hora de salida" className="scroll-mt-24 lg:col-span-12">
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
             <Indicador etiqueta="En cola" valor={m.surtido.enCola} contexto={m.surtido.urgentes ? `${m.surtido.urgentes} urgente` : "Sin urgencias"} tono={m.surtido.urgentes ? "alerta" : undefined} />
             <Indicador etiqueta="Surtiendo" valor={m.surtido.surtiendo} />

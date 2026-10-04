@@ -5,7 +5,7 @@ import { useSyncExternalStore } from "react";
  * tener al Recibidor en una pestaña y a la Supervisora en otra, compartiendo los mismos datos.
  */
 
-export type Perfil = "recibidor" | "acomodador" | "surtidor" | "supervisor" | "tienda" | "area_jefe" | "area_recibe" | "calidad" | "compras";
+export type Perfil = "recibidor" | "acomodador" | "surtidor" | "supervisor" | "tienda" | "area_jefe" | "area_recibe" | "calidad" | "compras" | "direccion";
 export type ClaveAreaSesion = "panaderia" | "cocina" | "dulceria";
 
 export interface Usuario {
@@ -46,6 +46,7 @@ export const USUARIOS: Usuario[] = [
   { id: "carlos", nombre: "Carlos Méndez", correo: "carlos.mendez@momi.test", perfil: "area_jefe", puesto: "Jefe de Panadería", area: "panaderia", inicio: "/area?area=panaderia", grupo: "Escritorio" },
   { id: "ruben", nombre: "Rubén Araúz", correo: "ruben.arauz@momi.test", perfil: "area_jefe", puesto: "Jefe de Cocina", area: "cocina", inicio: "/area?area=cocina", grupo: "Escritorio" },
   { id: "maria", nombre: "María Cedeño", correo: "maria.cedeno@momi.test", perfil: "area_jefe", puesto: "Jefa de Dulcería", area: "dulceria", inicio: "/area?area=dulceria", grupo: "Escritorio" },
+  { id: "eduardo", nombre: "Eduardo Him", correo: "eduardo.him@momi.test", perfil: "direccion", puesto: "Director General", inicio: "/direccion", grupo: "Escritorio" },
   { id: "marisol", nombre: "Marisol Quintero", correo: "marisol.quintero@momi.test", perfil: "calidad", puesto: "Calidad", inicio: "/supervisor", grupo: "Escritorio", proximamente: true },
   { id: "katia", nombre: "Ana Batista", correo: "ana.batista@momi.test", perfil: "compras", puesto: "Compras", inicio: "/supervisor", grupo: "Escritorio", proximamente: true },
 ];
@@ -63,6 +64,8 @@ export function permitido(u: Usuario | null, ruta: string, area?: string | null)
   if (!u) return false;
   if (ruta === "/pda/surtir-ventana") ruta = "/pda/surtir";
   if (u.perfil === "supervisor") return true;
+  // Dirección ve su torre y, para seguir lo que escala, la torre del almacén.
+  if (u.perfil === "direccion") return ruta.startsWith("/direccion") || ruta === "/supervisor";
   if (ruta === "/area") return u.perfil === "area_jefe" && area === u.area;
   if (ruta === "/pda/area") return (u.perfil === "area_jefe" || u.perfil === "area_recibe") && area === u.area;
   if (ruta === "/pda") return !!PDA[u.perfil];

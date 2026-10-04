@@ -27,6 +27,7 @@ servidor, las credenciales están en `src/lib/sesion.ts` y no protegen nada de v
 | jose.pinzon@momi.test · delia.castillo@momi.test · ana.rodriguez@momi.test | Reciben en Panadería · Cocina · Dulcería | PDA de su área |
 | carlos.mendez@momi.test · ruben.arauz@momi.test · maria.cedeno@momi.test | Jefes de Panadería · Cocina · Dulcería | Escritorio de su área |
 | rosa.villalaz@momi.test | Supervisora (ve todo) | /supervisor |
+| eduardo.him@momi.test | Director General | /direccion (y la torre del almacén) |
 | marisol.quintero@momi.test · ana.batista@momi.test | Calidad · Compras | Próximamente |
 
 ## Despliegue (Vercel)
@@ -119,6 +120,21 @@ aprobación:
 En la maqueta, el detalle del pedido en el escritorio del área también permite **simular la respuesta** de la
 supervisora (aprobar, pasar a la ventana o rechazar). La decisión queda en el recorrido del pedido y en la hoja de
 solicitud.
+
+## Dirección General
+
+`/direccion` integra el módulo de Dirección de Lovable: la **Torre de Control** con seis indicadores (margen
+perdido, fill rate, días de inventario, OTIF de proveedores, cumplimiento del plan y exactitud de inventario),
+margen perdido con proyección a diciembre, capital por clase ABC, riesgo de caducidad por cámara, costo por proceso,
+horas de retraso por área y día, negocio por canal, excepciones que escalan, valor de inventario, top fugas, actividad
+en tiempo real y órdenes y compromisos abiertos (ordenables, paginados, exportables a CSV).
+
+Cada panel tiene **Análisis ✦** (qué está pasando, por qué, si no haces nada, qué hacer con quién decide, para cuándo
+y cuánto vale, y qué no se sabe) y un panel lateral de detalle. Las cifras de negocio en USD son de ejemplo; lo que la
+maqueta ya opera sale en vivo: exactitud de inventario, lotes vencidos disponibles, compromisos de surtido vencidos,
+citas de proveedor vencidas, actividad y órdenes abiertas. Los enlaces de "Qué hacer" abren la torre del almacén en el
+visor correspondiente (`/supervisor?ver=caducidad|inventario|merma|ordenes|surtido`). Las demás secciones del menú
+quedan como "todavía no está en la maqueta", igual que en Lovable.
 
 ## Fecha
 

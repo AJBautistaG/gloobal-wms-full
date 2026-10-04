@@ -14,6 +14,7 @@ import SupervisorDesktop from "@/pages/supervisor/SupervisorDesktop";
 import Area from "@/pages/area/Area";
 import AreaEscritorio from "@/pages/area/AreaEscritorio";
 import Login from "@/pages/Login";
+import Direccion from "@/pages/direccion/Direccion";
 import { Inicio, Protegida } from "@/components/Protegida";
 
 export default function App() {
@@ -21,7 +22,7 @@ export default function App() {
   const { pathname } = useLocation();
   // En escritorio los avisos van abajo a la derecha para no tapar el encabezado ni los indicadores;
   // en el PDA, arriba al centro, donde el operador los ve al instante.
-  const escritorio = pathname.startsWith("/supervisor") || pathname === "/area";
+  const escritorio = pathname.startsWith("/supervisor") || pathname === "/area" || pathname.startsWith("/direccion");
   return (
     <>
       <Toaster
@@ -75,6 +76,14 @@ function Rutas() {
         element={
           <Protegida>
             <AreaEscritorio />
+          </Protegida>
+        }
+      />
+      <Route
+        path="/direccion/:seccion?"
+        element={
+          <Protegida>
+            <Direccion />
           </Protegida>
         }
       />
