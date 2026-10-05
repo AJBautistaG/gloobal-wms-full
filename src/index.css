@@ -31,6 +31,10 @@
   --color-neutro: var(--neutro);
   --color-serie-entrada: var(--serie-entrada);
   --color-serie-salida: var(--serie-salida);
+  --color-causa-merma: var(--causa-merma);
+  --color-causa-caducidad: var(--causa-caducidad);
+  --color-causa-desabasto: var(--causa-desabasto);
+  --color-causa-diferencias: var(--causa-diferencias);
 
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
@@ -63,6 +67,11 @@
   /* Series de gráficas (validadas para daltonismo contra la tarjeta): entradas y salidas. */
   --serie-entrada: oklch(52% 0.14 245);
   --serie-salida: oklch(52.74% 0.2119 5.21);
+  /* Causas del impacto económico (Dirección), validadas para daltonismo en el orden de apilado. */
+  --causa-merma: oklch(45% 0.13 250);
+  --causa-caducidad: oklch(70% 0.15 70);
+  --causa-desabasto: oklch(52% 0.2 355);
+  --causa-diferencias: oklch(62% 0.12 290);
 }
 
 .dark {
@@ -89,6 +98,10 @@
   --neutro: oklch(72.12% 0.0159 345.99);
   --serie-entrada: oklch(64% 0.13 245);
   --serie-salida: oklch(64% 0.2 358);
+  --causa-merma: oklch(50% 0.13 245);
+  --causa-caducidad: oklch(66% 0.14 70);
+  --causa-desabasto: oklch(60% 0.2 358);
+  --causa-diferencias: oklch(67% 0.12 300);
 }
 
 /* Los flujos a pantalla completa (Recibir, Acomodar) usan colores sólidos de mayor contraste. */

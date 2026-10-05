@@ -123,18 +123,28 @@ solicitud.
 
 ## Dirección General
 
-`/direccion` integra el módulo de Dirección de Lovable: la **Torre de Control** con seis indicadores (margen
-perdido, fill rate, días de inventario, OTIF de proveedores, cumplimiento del plan y exactitud de inventario),
-margen perdido con proyección a diciembre, capital por clase ABC, riesgo de caducidad por cámara, costo por proceso,
-horas de retraso por área y día, negocio por canal, excepciones que escalan, valor de inventario, top fugas, actividad
-en tiempo real y órdenes y compromisos abiertos (ordenables, paginados, exportables a CSV).
+`/direccion` es la Torre de Control de Dirección (propuesta TO-BE, basada en el módulo de Lovable y ajustada con el
+delta funcional de Dirección). Se organiza en tres preguntas:
 
-Cada panel tiene **Análisis ✦** (qué está pasando, por qué, si no haces nada, qué hacer con quién decide, para cuándo
-y cuánto vale, y qué no se sabe) y un panel lateral de detalle. Las cifras de negocio en USD son de ejemplo; lo que la
-maqueta ya opera sale en vivo: exactitud de inventario, lotes vencidos disponibles, compromisos de surtido vencidos,
-citas de proveedor vencidas, actividad y órdenes abiertas. Los enlaces de "Qué hacer" abren la torre del almacén en el
-visor correspondiente (`/supervisor?ver=caducidad|inventario|merma|ordenes|surtido`). Las demás secciones del menú
-quedan como "todavía no está en la maqueta", igual que en Lovable.
+- **Resultado** (¿qué tan bien cumplimos?): fill rate a canales, OTIF de proveedores, cumplimiento del plan de producción.
+- **Capital y pérdida** (¿dónde está el dinero y dónde se erosiona?): impacto económico de excepciones (merma, caducidad,
+  desabasto y diferencias confirmadas), días de inventario, capital inmovilizado por días sin movimiento, valor de
+  inventario (por cámara y familia o por clase ABC, separando disponible, comprometido y retenido), costo por proceso.
+- **Riesgo** (¿qué puede afectar el negocio?): valor económico en riesgo, exactitud de inventario, riesgo de caducidad en
+  cuatro bandas (vencido, ≤ 7, 8–30, > 30 días), excepciones que escalan con impacto, responsable y siguiente acción.
+
+Reglas de la maqueta:
+
+- **Desglose en niveles:** cada indicador abre Dirección → causa o dominio → detalle operacional (artículo, lote,
+  ubicación, cantidad, incidencia, responsable, estado), y cada nivel suma exactamente lo del nivel de arriba.
+- **Semántica:** una diferencia en investigación o un "no se encontró" no es pérdida; cuenta en el valor en riesgo,
+  no en el impacto económico. La proyección es un **escenario** (base contra objetivo con WMS) con su supuesto visible.
+- **Fuente del dato** (D1 disponible, D2 calculable con WMS, D3 requiere integración, D4 analítica) se ve en el
+  detalle, no en la vista principal.
+- Las cifras en USD son de ejemplo y cuadran entre sí; lo que la maqueta ya opera sale en vivo (exactitud, lotes
+  vencidos, compromisos de surtido, citas de proveedor, actividad y órdenes).
+- Cada panel tiene **Análisis ✦** (qué pasa, por qué, si no haces nada, qué hacer, qué no sé) con enlaces a la torre
+  del almacén (`/supervisor?ver=caducidad|inventario|merma|ordenes|surtido`).
 
 ## Fecha
 

@@ -1,99 +1,396 @@
-import { HOY, sumarDias } from "@/lib/fecha";
+import { HOY } from "@/lib/fecha";
 import { diasEntre, fechaConAnio, horaActual } from "@/lib/utils";
 import { INVENTARIO, diasPara, estadoLotesStore, exactitudStore, type EstadoLote, type Exactitud } from "./caducidad";
-import { incidenciasStore, type Incidencia } from "./incidencias";
+import { esPendiente, incidenciasStore, type Incidencia } from "./incidencias";
 import { resumenOrden, ordenesStore } from "./ordenes";
 import { todasLasOrdenes } from "./recepcion";
 import { recepcionesStore, type RegistroRecepcion } from "./recepciones";
 import { estadoDe, insumoDe, minutosDelDia, pedidosAreaStore, surtidoStore, trabajosDelDia, type EstadoTrabajo, type PedidoArea } from "./surtido";
 
 /**
- * Dirección General (basado en el módulo de Lovable): resultado, capital de trabajo y riesgo de
- * toda la operación. Las cifras de negocio (USD, ventas, costos) son datos de ejemplo; lo que la
- * maqueta ya opera (lotes vencidos, citas, surtido, exactitud, actividad, órdenes) sale en vivo.
+ * Torre de Control de Dirección (propuesta TO-BE). Se organiza en Resultado (¿qué tan bien
+ * cumplimos?), Capital y pérdida (¿dónde está el dinero y dónde se erosiona?) y Riesgo (¿qué puede
+ * afectar el negocio?). Las cifras de negocio son de ejemplo pero cuadran entre sí en cada nivel:
+ * Dirección → causa → detalle. Lo que la maqueta ya opera (lotes, surtido, citas, exactitud,
+ * actividad, órdenes) sale en vivo.
  */
 
 export const DIRECTOR = { nombre: "Eduardo Him", puesto: "Director General" };
 
-// ── Filtros ─────────────────────────────────────────────────────
-
-export type Periodo = "mes" | "90d" | "anio";
-
-const inicioMes = HOY.slice(0, 8) + "01";
-export const PERIODOS: { id: Periodo; texto: string; rango: string; factor: number }[] = [
-  { id: "mes", texto: "Mes a la fecha", rango: `${fechaConAnio(inicioMes).replace(/ \d{4}$/, "")} – ${fechaConAnio(HOY)}`, factor: 1 },
-  { id: "90d", texto: "Últimos 90 días", rango: `${fechaConAnio(sumarDias(HOY, -89))} – ${fechaConAnio(HOY)}`, factor: 2.9 },
-  { id: "anio", texto: "Año", rango: `1 ene – ${fechaConAnio(HOY)}`, factor: 9.4 },
-];
-
-export const AREAS_DIR = ["Todas las áreas", "Panadería", "Dulcería", "Cocina", "Almacén Central"];
-export const CANALES = ["Todos los canales", "Áreas de producción", "Tiendas · rutas", "E-commerce", "Pedidos especiales"];
-
-// ── Indicadores principales ─────────────────────────────────────
-
-export interface Kpi {
-  id: string;
-  nombre: string;
-  valor: number;
-  unidad: string;
-  /** Cambio contra el periodo anterior y si ese cambio es bueno. */
-  cambio: { texto: string; bueno: boolean };
-  meta: { texto: string; valor: number; mayorEsMejor: boolean };
-  /** Escala de la barra de avance. */
-  escala: [number, number];
-  apoyo: [{ valor: string; texto: string }, { valor: string; texto: string }];
-}
+/** Disponibilidad del dato (metadata para evaluar integración; no es para Dirección). */
+export const DISPONIBILIDAD = {
+  D1: "Disponible hoy",
+  D2: "Calculable con WMS",
+  D3: "Requiere integración (ERP, ventas, costos, producción)",
+  D4: "Analítica o proyección",
+} as const;
+export type Disponibilidad = keyof typeof DISPONIBILIDAD;
 
 const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
 export const usd = fmt;
 export const usdCorto = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(2).replace(/0$/, "")} M` : n >= 1e3 ? `${Math.round(n / 1e3)} K` : fmt(n));
+const sumar = (xs: number[]) => xs.reduce((s, x) => s + x, 0);
 
-export function kpis(periodo: Periodo, exactitud: Exactitud): Kpi[] {
-  const f = PERIODOS.find((p) => p.id === periodo)!.factor;
-  const merma = 9180 * f;
-  const desabasto = 11019 * f;
-  const lecturas = exactitud.coinciden + exactitud.difieren;
-  const exact = lecturas ? Math.round((exactitud.coinciden / lecturas) * 1000) / 10 : 100;
-  return [
-    { id: "margen", nombre: "Margen perdido", valor: merma + desabasto, unidad: "USD", cambio: { texto: "+8.4 %", bueno: false }, meta: { texto: `Meta ≤ ${fmt(12500 * f)} USD`, valor: 12500 * f, mayorEsMejor: false }, escala: [0, 26000 * f], apoyo: [{ valor: fmt(merma), texto: "Merma" }, { valor: fmt(desabasto), texto: "Desabasto" }] },
-    { id: "fill", nombre: "Fill rate a canales", valor: 86.4, unidad: "%", cambio: { texto: "+1.2 pp", bueno: true }, meta: { texto: "Meta ≥ 95 %", valor: 95, mayorEsMejor: true }, escala: [0, 100], apoyo: [{ valor: fmt(1843 * f), texto: "Líneas surtidas" }, { valor: fmt(2133 * f), texto: "Solicitadas" }] },
-    { id: "dias", nombre: "Días de inventario", valor: 34, unidad: "días", cambio: { texto: "+2 d", bueno: false }, meta: { texto: "Meta ≤ 24 días", valor: 24, mayorEsMejor: false }, escala: [0, 40], apoyo: [{ valor: "1.25 M", texto: "USD en stock" }, { valor: fmt(36765), texto: "USD por día" }] },
-    { id: "otif", nombre: "OTIF de proveedores", valor: 76, unidad: "%", cambio: { texto: "−3 pp", bueno: false }, meta: { texto: "Meta ≥ 90 %", valor: 90, mayorEsMejor: true }, escala: [0, 100], apoyo: [{ valor: fmt(38 * f), texto: "A tiempo y completo" }, { valor: fmt(50 * f), texto: "Recibos del periodo" }] },
-    { id: "plan", nombre: "Cumplimiento del plan", valor: 91.2, unidad: "%", cambio: { texto: "−1.8 pp", bueno: false }, meta: { texto: "Meta ≥ 98 %", valor: 98, mayorEsMejor: true }, escala: [0, 100], apoyo: [{ valor: fmt(1368 * f), texto: "Unidades producidas" }, { valor: fmt(1500 * f), texto: "Planeadas" }] },
-    // En vivo: las mismas lecturas de lote que registra el PDA (KPI-Exactitud por lote).
-    { id: "exactitud", nombre: "Exactitud de inventario", valor: exact, unidad: "%", cambio: { texto: "+1.1 pp", bueno: true }, meta: { texto: "Meta ≥ 98 %", valor: 98, mayorEsMejor: true }, escala: [0, 100], apoyo: [{ valor: fmt(exactitud.coinciden), texto: "Lecturas que coinciden" }, { valor: fmt(lecturas), texto: "Lecturas de lote" }] },
-  ];
-}
-
-export const cumpleMeta = (k: Kpi) => (k.meta.mayorEsMejor ? k.valor >= k.meta.valor : k.valor <= k.meta.valor);
-
-// ── Margen perdido y proyección ─────────────────────────────────
+// ── Periodo (meses cerrados, para que tarjetas y gráfica digan lo mismo) ──
 
 export const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-export const MARGEN_MENSUAL = {
-  merma: [6100, 6400, 6900, 7200, 7500, 7900, 8300, 8700, 9180],
-  desabasto: [7600, 8100, 8500, 8900, 9300, 9700, 10100, 10600, 11019],
-  /** Octubre a diciembre. */
-  sinCambios: [21200, 22200, 23200],
-  conWms: [21200, 18800, 16400],
+export type Periodo = "mes" | "trimestre" | "anio";
+export const PERIODOS: { id: Periodo; texto: string; rango: string; meses: number[]; anterior?: number[] }[] = [
+  { id: "mes", texto: "Último mes cerrado", rango: "1 – 30 sep 2026", meses: [8], anterior: [7] },
+  { id: "trimestre", texto: "Último trimestre", rango: "jul – sep 2026", meses: [6, 7, 8], anterior: [3, 4, 5] },
+  { id: "anio", texto: "Año a la fecha", rango: "ene – sep 2026", meses: [0, 1, 2, 3, 4, 5, 6, 7, 8] },
+];
+export const periodoDe = (p: Periodo) => PERIODOS.find((x) => x.id === p)!;
+
+export const AREAS_DIR = ["Todas las áreas", "Panadería", "Dulcería", "Cocina", "Almacén Central"];
+export const CANALES = ["Todos los canales", "Áreas de producción", "Tiendas · rutas", "E-commerce", "Pedidos especiales"];
+
+// ── Capital y pérdida: impacto económico de excepciones ─────────
+
+export type Causa = "merma" | "caducidad" | "desabasto" | "diferencias";
+export const CAUSAS: { id: Causa; nombre: string; clase: string; trazo: string; definicion: string }[] = [
+  { id: "merma", nombre: "Merma", clase: "bg-causa-merma", trazo: "fill-causa-merma", definicion: "Producto dañado o desechado, con causa confirmada" },
+  { id: "caducidad", nombre: "Caducidad", clase: "bg-causa-caducidad", trazo: "fill-causa-caducidad", definicion: "Lotes que vencieron antes de consumirse" },
+  { id: "desabasto", nombre: "Desabasto", clase: "bg-causa-desabasto", trazo: "fill-causa-desabasto", definicion: "Demanda no atendida, valuada a costo" },
+  { id: "diferencias", nombre: "Diferencias", clase: "bg-causa-diferencias", trazo: "fill-causa-diferencias", definicion: "Ajustes de inventario confirmados (no las que siguen en investigación)" },
+];
+
+/** Impacto mensual por causa, enero a septiembre (USD). */
+export const IMPACTO_MENSUAL: Record<Causa, number[]> = {
+  merma: [6100, 6400, 6700, 7000, 7300, 7700, 8100, 8500, 9180],
+  caducidad: [1500, 1550, 1600, 1650, 1700, 1780, 1860, 1960, 2110],
+  desabasto: [5000, 5200, 5400, 5700, 5900, 6100, 6400, 6700, 7250],
+  diferencias: [1100, 1150, 1180, 1220, 1260, 1300, 1380, 1474, 1659],
+};
+export const totalMes = (i: number) => sumar(CAUSAS.map((c) => IMPACTO_MENSUAL[c.id][i]));
+
+/** Escenario proyectado oct–dic: base (sin cambios) contra objetivo con WMS. Supuestos, no resultados. */
+export const ESCENARIO = { base: [21200, 22200, 23200], objetivo: [21200, 18800, 16400] };
+export const SUPUESTO_ESCENARIO = "Proyección basada en supuestos de reducción objetivo de merma, desabasto y diferencias.";
+
+export function impactoDe(periodo: Periodo) {
+  const p = periodoDe(periodo);
+  const porCausa = Object.fromEntries(CAUSAS.map((c) => [c.id, sumar(p.meses.map((i) => IMPACTO_MENSUAL[c.id][i]))])) as Record<Causa, number>;
+  const total = sumar(Object.values(porCausa));
+  const anterior = p.anterior ? sumar(p.anterior.map(totalMes)) : null;
+  return { porCausa, total, cambio: anterior ? (total / anterior - 1) * 100 : null };
+}
+
+/** Una fila de detalle operacional (nivel 3). La última columna siempre es el valor en USD. */
+export interface Fila {
+  celdas: string[];
+  usd: number;
+  estado?: string;
+}
+
+/** Completa con "Otros …" para que el detalle sume exactamente el total de su causa. */
+function conResto(filas: Fila[], total: number, resto: string, columnas: number): Fila[] {
+  const falta = total - sumar(filas.map((f) => f.usd));
+  return falta > 0 ? [...filas, { celdas: [resto, ...Array(columnas - 1).fill("—")], usd: falta }] : filas;
+}
+
+const COL_IMPACTO = ["Artículo", "Lote · ubicación", "Cantidad", "Incidencia", "Responsable", "Estado"];
+
+/** Detalle del impacto de septiembre por causa (en otros periodos se muestra el desglose por mes). */
+export const DETALLE_IMPACTO: Record<Causa, { columnas: string[]; filas: Fila[] }> = {
+  merma: {
+    columnas: COL_IMPACTO,
+    filas: conResto(
+      [
+        { celdas: ["Aceite vegetal · ACE-18", "L120925 · PA-R10-N1-P01", "40 LT", "INC-0907 · dañado", "Almacén", "Merma confirmada"], usd: 1870 },
+        { celdas: ["Producto de panadería · PT-PAN-001", "L280925 · Panadería", "310 PZA", "INC-0912 · sin venta", "Panadería", "Merma confirmada"], usd: 1540 },
+        { celdas: ["Mantequilla sin sal · MAN-10", "L040925 · PB-CF2", "10 KG", "INC-0918 · dañado", "Calidad", "Merma confirmada"], usd: 820 },
+        { celdas: ["Chocolate cobertura · CHO-05", "L010925 · PB-R07-N2-P03", "6 KG", "INC-0921 · humedad", "Calidad", "Merma confirmada"], usd: 690 },
+      ],
+      9180,
+      "Otros 38 registros de merma",
+      6,
+    ),
+  },
+  caducidad: {
+    columnas: COL_IMPACTO,
+    filas: conResto(
+      [
+        { celdas: ["Crema de leche UHT · CRE-UHT", "L280825 · PB-CF1", "24 LT", "INC-0903 · vencido", "Calidad", "Merma confirmada"], usd: 1210 },
+        { celdas: ["Queso crema · QCR-10", "L050925 · PB-CF2", "10 KG", "INC-0915 · vencido", "Calidad", "Merma confirmada"], usd: 640 },
+      ],
+      2110,
+      "Otros 4 lotes vencidos",
+      6,
+    ),
+  },
+  desabasto: {
+    columnas: COL_IMPACTO,
+    filas: conResto(
+      [
+        { celdas: ["Harina Gold Mills dura · HAR-GM50", "— · sin existencia", "4,830 KG", "Pedidos de Panadería", "Compras", "Demanda no atendida"], usd: 3480 },
+        { celdas: ["Azúcar refinada · AZU-R25", "— · sin existencia", "2,780 KG", "Pedidos de Dulcería", "Compras", "Demanda no atendida"], usd: 2640 },
+      ],
+      7250,
+      "Otras 9 líneas no surtidas",
+      6,
+    ),
+  },
+  diferencias: {
+    columnas: COL_IMPACTO,
+    filas: conResto(
+      [
+        { celdas: ["Levadura seca · LEV-10", "L200925 · PA-R12-N2-P05", "−3 cajas", "CNT-0042", "Supervisor de almacén", "Ajuste confirmado"], usd: 620 },
+        { celdas: ["Cacao en polvo · CAC-05", "L100925 · PA-R12-N3-P01", "−2 cajas", "CNT-0047", "Supervisor de almacén", "Ajuste confirmado"], usd: 410 },
+      ],
+      1659,
+      "Otros 12 ajustes confirmados",
+      6,
+    ),
+  },
 };
 
-// ── Capital, caducidad, costos, retrasos ────────────────────────
+// ── Riesgo: valor económico en riesgo (foto de hoy) ─────────────
 
-export const CAPITAL_ABC = [
-  { clase: "Clase A", valor: 500000, rota: 12, detalle: "20 % de los artículos · 80 % del consumo" },
-  { clase: "Clase B", valor: 437500, rota: 31, detalle: "30 % de los artículos · 15 % del consumo" },
-  { clase: "Clase C", valor: 312500, rota: 68, detalle: "50 % de los artículos · 5 % del consumo" },
+export type Banda = "vencido" | "7" | "30" | "mas30";
+export const BANDAS: { id: Banda; nombre: string; clase: string; trazo: string }[] = [
+  { id: "vencido", nombre: "Vencido", clase: "bg-critico", trazo: "stroke-critico" },
+  { id: "7", nombre: "≤ 7 días", clase: "bg-critico/50", trazo: "stroke-critico/50" },
+  { id: "30", nombre: "8 a 30 días", clase: "bg-alerta", trazo: "stroke-alerta" },
+  { id: "mas30", nombre: "Más de 30 días", clase: "bg-exito/70", trazo: "stroke-exito/70" },
 ];
 
 export const CAMARAS = ["Todas", "Seco", "Refrigerado", "Congelado"] as const;
 export type Camara = (typeof CAMARAS)[number];
-export const RIESGO_CADUCIDAD: Record<Camara, { critico: number; proximo: number; sano: number }> = {
-  Todas: { critico: 47000, proximo: 112000, sano: 1091000 },
-  Seco: { critico: 6000, proximo: 31000, sano: 692000 },
-  Refrigerado: { critico: 33000, proximo: 61000, sano: 224000 },
-  Congelado: { critico: 8000, proximo: 20000, sano: 175000 },
+type Perecedera = Exclude<Camara, "Todas">;
+
+/** Valor por banda de caducidad y cámara. Cada cámara suma su valor de inventario (el empaque no caduca). */
+const CADUCIDAD_CAMARA: Record<Perecedera, Record<Banda, number>> = {
+  Seco: { vencido: 2000, "7": 4000, "30": 31000, mas30: 519000 },
+  Refrigerado: { vencido: 12000, "7": 21000, "30": 61000, mas30: 224000 },
+  Congelado: { vencido: 4000, "7": 4000, "30": 20000, mas30: 175000 },
 };
+export function caducidadDe(camara: Camara): Record<Banda, number> {
+  const cs: Perecedera[] = camara === "Todas" ? ["Seco", "Refrigerado", "Congelado"] : [camara];
+  return Object.fromEntries(BANDAS.map((b) => [b.id, sumar(cs.map((c) => CADUCIDAD_CAMARA[c][b.id]))])) as Record<Banda, number>;
+}
+
+/** Lotes con mayor valor por banda (los mismos lotes del almacén, con su estado en vivo). */
+const LOTES_RIESGO: { bulto: string; banda: Banda; camara: Perecedera; usd: number }[] = [
+  { bulto: "B-102", banda: "vencido", camara: "Refrigerado", usd: 5100 },
+  { bulto: "B-103", banda: "vencido", camara: "Refrigerado", usd: 4600 },
+  { bulto: "B-101", banda: "vencido", camara: "Seco", usd: 1200 },
+  { bulto: "B-104", banda: "7", camara: "Refrigerado", usd: 6200 },
+  { bulto: "B-105", banda: "7", camara: "Refrigerado", usd: 5400 },
+  { bulto: "B-106", banda: "7", camara: "Refrigerado", usd: 3900 },
+  { bulto: "B-107", banda: "30", camara: "Seco", usd: 9800 },
+  { bulto: "B-108", banda: "30", camara: "Refrigerado", usd: 8600 },
+  { bulto: "B-109", banda: "30", camara: "Seco", usd: 6500 },
+  { bulto: "B-111", banda: "30", camara: "Seco", usd: 4200 },
+  { bulto: "B-110", banda: "30", camara: "Seco", usd: 3100 },
+];
+export const valorLote = (bulto: string) => LOTES_RIESGO.find((l) => l.bulto === bulto)?.usd ?? 0;
+
+export const COL_LOTES = ["Artículo", "Lote", "Ubicación", "Cantidad", "Caduca", "Días", "Estado"];
+
+export function lotesDeBanda(banda: Banda, camara: Camara, estados: Record<string, EstadoLote>): Fila[] {
+  const total = caducidadDe(camara)[banda];
+  const filas: Fila[] = LOTES_RIESGO.filter((l) => l.banda === banda && (camara === "Todas" || l.camara === camara)).map((l) => {
+    const b = INVENTARIO.find((x) => x.id === l.bulto)!;
+    const i = insumoDe(b.sku);
+    const e = estados[b.id];
+    const d = diasPara(b);
+    return {
+      celdas: [`${i.nombre} · ${b.sku}`, b.lote, b.posicion, `${b.bultos} ${b.bultos === 1 ? i.manejo.nombre : i.manejo.plural}`, fechaConAnio(b.caducidad), d < 0 ? `venció hace ${-d}` : String(d), e ? (e.estado === "descarte" ? "En descarte" : "Bloqueado") : "Disponible"],
+      usd: l.usd,
+    };
+  });
+  return conResto(filas, total, banda === "mas30" ? "Lotes con más de 30 días" : "Otros lotes de la banda", COL_LOTES.length);
+}
+
+/** Valor económico en riesgo: lo que hoy puede convertirse en pérdida. El sobrestock se ve en capital inmovilizado. */
+export function valorEnRiesgo(estados: Record<string, EstadoLote>) {
+  const cad = caducidadDe("Todas");
+  const componentes: { id: string; nombre: string; corto: string; usd: number; disponibilidad: Disponibilidad; columnas: string[]; filas: Fila[] }[] = [
+    {
+      id: "caducidad",
+      nombre: "Caducidad (vencido y ≤ 30 días)",
+      corto: "Caducidad",
+      usd: cad.vencido + cad["7"] + cad["30"],
+      disponibilidad: "D2",
+      columnas: COL_LOTES,
+      filas: [...lotesDeBanda("vencido", "Todas", estados), ...lotesDeBanda("7", "Todas", estados), ...lotesDeBanda("30", "Todas", estados)],
+    },
+    {
+      id: "diferencias",
+      nombre: "Diferencias en investigación",
+      corto: "Diferencias",
+      usd: 9870,
+      disponibilidad: "D2",
+      columnas: ["Artículo", "Ubicación", "Sistema", "Físico", "Incidencia", "Estado"],
+      filas: conResto(
+        [
+          { celdas: ["Piña galón · ING-PIÑA-001", "PB-CF3-02", "48 galones", "0", "CNT-0051", "No se encontró · en investigación"], usd: 3910 },
+          { celdas: ["Harina integral · HAR-INT", "PA-R12-N1-P03", "6 sacos", "4 sacos", "CNT-0053", "En investigación"], usd: 2140 },
+        ],
+        9870,
+        "Otras 6 posiciones en conteo",
+        6,
+      ),
+    },
+    {
+      id: "retenido",
+      nombre: "Dañado o retenido en cuarentena",
+      corto: "Retenido",
+      usd: 6240,
+      disponibilidad: "D2",
+      columnas: ["Artículo", "Lote", "Motivo", "Desde", "Responsable", "Estado"],
+      filas: conResto(
+        [
+          { celdas: ["Mantequilla sin sal · MAN-10", "L-2609M", "Daño en recepción", "hace 2 d", "Calidad", "En cuarentena"], usd: 2460 },
+          { celdas: ["Huevo líquido · HUE-LIQ", "L-2609E", "Vida útil corta", "hace 1 d", "Calidad", "En cuarentena"], usd: 1780 },
+        ],
+        6240,
+        "Otros 5 lotes retenidos",
+        6,
+      ),
+    },
+    {
+      id: "desabasto",
+      nombre: "Desabasto comprometido",
+      corto: "Desabasto",
+      usd: 9210,
+      disponibilidad: "D3",
+      columnas: ["Pedido o plan", "Insumo", "Falta", "Compromiso", "Responsable", "Estado"],
+      filas: conResto(
+        [
+          { celdas: ["Plan de Panadería", "Harina integral", "45 KG", "mañana 08:57", "Compras", "Sin cobertura"], usd: 1380 },
+          { celdas: ["ESP-0094 · Evento corporativo", "Crema de leche UHT", "24 LT", "hoy 17:00", "Supervisor de almacén", "En riesgo"], usd: 820 },
+        ],
+        9210,
+        "Otros 11 pedidos en riesgo",
+        6,
+      ),
+    },
+  ];
+  return { total: sumar(componentes.map((c) => c.usd)), cambio: -6.2, componentes };
+}
+
+// ── Capital: inmovilizado por antigüedad y valor por clase ABC ───
+
+export const VALOR_INVENTARIO = { fisico: 1250000, disponible: 1104000, comprometido: 98500, retenido: 47500 };
+
+export const INMOVILIZADO: { tramo: string; usd: number; filas: Fila[] }[] = [
+  { tramo: "31–60 días", usd: 96400, filas: conResto([{ celdas: ["Aceite vegetal · ACE-18", "PA-R10-N1-P01", "48 días"], usd: 22800 }, { celdas: ["Leche en polvo · LEC-P25", "PB-R05-N1-P02", "41 días"], usd: 19600 }], 96400, "Otros 64 artículos", 3) },
+  { tramo: "61–90 días", usd: 71200, filas: conResto([{ celdas: ["Azúcar glas · AZU-G25", "PB-R02-N1-P07", "77 días"], usd: 18300 }, { celdas: ["Avena en hojuelas · AVE-10", "PB-R03-N1-P04", "70 días"], usd: 9700 }], 71200, "Otros 41 artículos", 3) },
+  { tramo: "91–180 días", usd: 58600, filas: conResto([{ celdas: ["Cacao en polvo · CAC-05", "PA-R12-N3-P01", "126 días"], usd: 14600 }, { celdas: ["Bolsa de papel para pan · BOL-PAN", "PB-R04-N3-P01", "104 días"], usd: 11200 }], 58600, "Otros 28 artículos", 3) },
+  { tramo: "+180 días", usd: 36300, filas: conResto([{ celdas: ['Base de cartón dorada 10" · EMP-B10', "PB-R04-N2-P02", "212 días"], usd: 12400 }, { celdas: ["Esencia de vainilla · VAI-04", "PB-R03-N2-P03", "196 días"], usd: 8900 }], 36300, "Otros 17 artículos", 3) },
+];
+export const totalInmovilizado = () => sumar(INMOVILIZADO.map((t) => t.usd));
+
+/** Valor por clasificación ABC (concentración del valor, no inmovilizado). Suma el valor físico. */
+export const ABC = [
+  { clase: "Clase A", valor: 500000, rota: 12, detalle: "20 % de los artículos · 80 % del consumo" },
+  { clase: "Clase B", valor: 437500, rota: 31, detalle: "30 % de los artículos · 15 % del consumo" },
+  { clase: "Clase C", valor: 312500, rota: 72, detalle: "50 % de los artículos · 5 % del consumo" },
+];
+/** Días de inventario = rotación ponderada por valor (34 días). */
+export const diasInventario = () => Math.round(sumar(ABC.map((c) => c.valor * c.rota)) / sumar(ABC.map((c) => c.valor)));
+
+export const VALOR_CAMARA = [
+  { camara: "Seco", mp: 318000, insumos: 142000, pt: 96000 },
+  { camara: "Refrigerado", mp: 186000, insumos: 74000, pt: 58000 },
+  { camara: "Congelado", mp: 121000, insumos: 38000, pt: 44000 },
+  { camara: "Empaque", mp: 0, insumos: 173000, pt: 0 },
+];
+
+// ── Resultado: indicadores con su desglose ──────────────────────
+
+export interface Desglose {
+  titulo: string;
+  columnas: string[];
+  filas: { nombre: string; hecho: number; base: number }[];
+}
+
+export interface Kpi {
+  id: string;
+  dimension: "resultado" | "capital" | "riesgo";
+  nombre: string;
+  pregunta: string;
+  valor: number;
+  unidad: string;
+  cambio: { texto: string; bueno: boolean } | null;
+  meta?: { texto: string; valor: number; mayorEsMejor: boolean };
+  escala?: [number, number];
+  apoyo: { valor: string; texto: string }[];
+  disponibilidad: Disponibilidad;
+  desglose?: Desglose;
+}
+
+const pct = (a: number, b: number) => Math.round((a / b) * 1000) / 10;
+
+export function kpis(periodo: Periodo, exactitud: Exactitud, estados: Record<string, EstadoLote>): Kpi[] {
+  const p = periodoDe(periodo);
+  const n = p.meses.length;
+  const imp = impactoDe(periodo);
+  const riesgo = valorEnRiesgo(estados);
+  const lecturas = exactitud.coinciden + exactitud.difieren;
+  const escalar = (filas: Desglose["filas"]) => filas.map((f) => ({ ...f, hecho: f.hecho * n, base: f.base * n }));
+  const fill = escalar([
+    { nombre: "Áreas de producción", hecho: 860, base: 1010 },
+    { nombre: "Tiendas · rutas", hecho: 640, base: 720 },
+    { nombre: "E-commerce", hecho: 228, base: 250 },
+    { nombre: "Pedidos especiales", hecho: 115, base: 153 },
+  ]);
+  const otif = escalar([
+    { nombre: "Alimentos de Primera", hecho: 12, base: 20 },
+    { nombre: "Pastas del Istmo", hecho: 11, base: 13 },
+    { nombre: "Empaques Delta", hecho: 9, base: 10 },
+    { nombre: "Alimentos del Norte", hecho: 6, base: 7 },
+  ]);
+  const plan = escalar([
+    { nombre: "Panadería", hecho: 612, base: 680 },
+    { nombre: "Dulcería", hecho: 448, base: 500 },
+    { nombre: "Cocina", hecho: 308, base: 320 },
+  ]);
+  const tot = (fs: Desglose["filas"]) => [sumar(fs.map((f) => f.hecho)), sumar(fs.map((f) => f.base))];
+  const [fh, fb] = tot(fill);
+  const [oh, ob] = tot(otif);
+  const [ph, pb] = tot(plan);
+  const cambio = (t: string, bueno: boolean) => ({ texto: t, bueno });
+  return [
+    { id: "fill", dimension: "resultado", nombre: "Fill rate a canales", pregunta: "¿Qué parte de la demanda solicitada se atendió?", valor: pct(fh, fb), unidad: "%", cambio: cambio("+1.2 pp", true), meta: { texto: "Meta ≥ 95 %", valor: 95, mayorEsMejor: true }, escala: [0, 100], apoyo: [{ valor: fmt(fh), texto: "Líneas surtidas" }, { valor: fmt(fb), texto: "Solicitadas" }], disponibilidad: "D2", desglose: { titulo: "Por canal", columnas: ["Canal", "Surtidas", "Solicitadas", "Fill rate"], filas: fill } },
+    { id: "otif", dimension: "resultado", nombre: "OTIF de proveedores", pregunta: "¿Los proveedores entregan completo y a tiempo?", valor: pct(oh, ob), unidad: "%", cambio: cambio("−3 pp", false), meta: { texto: "Meta ≥ 90 %", valor: 90, mayorEsMejor: true }, escala: [0, 100], apoyo: [{ valor: fmt(oh), texto: "A tiempo y completo" }, { valor: fmt(ob), texto: "Recibos del periodo" }], disponibilidad: "D2", desglose: { titulo: "Por proveedor", columnas: ["Proveedor", "A tiempo y completo", "Recibos", "OTIF"], filas: otif } },
+    { id: "plan", dimension: "resultado", nombre: "Cumplimiento del plan de producción", pregunta: "¿Qué parte del plan programado se produjo?", valor: pct(ph, pb), unidad: "%", cambio: cambio("−1.8 pp", false), meta: { texto: "Meta ≥ 98 %", valor: 98, mayorEsMejor: true }, escala: [0, 100], apoyo: [{ valor: fmt(ph), texto: "Unidades producidas" }, { valor: fmt(pb), texto: "Planeadas" }], disponibilidad: "D3", desglose: { titulo: "Por área", columnas: ["Área", "Producidas", "Planeadas", "Cumplimiento"], filas: plan } },
+    {
+      id: "impacto",
+      dimension: "capital",
+      nombre: "Impacto económico de excepciones",
+      pregunta: "¿Cuánto costaron la merma, la caducidad, el desabasto y las diferencias?",
+      valor: imp.total,
+      unidad: "USD",
+      cambio: imp.cambio === null ? null : cambio(`${imp.cambio >= 0 ? "+" : "−"}${Math.abs(imp.cambio).toFixed(1)} %`, imp.cambio < 0),
+      apoyo: CAUSAS.map((c) => ({ valor: fmt(imp.porCausa[c.id]), texto: c.nombre })),
+      disponibilidad: "D3",
+    },
+    { id: "dias", dimension: "capital", nombre: "Días de inventario", pregunta: "¿Cuántos días de consumo cubre el inventario?", valor: diasInventario(), unidad: "días", cambio: cambio("+2 d", false), meta: { texto: "Meta ≤ 24 días", valor: 24, mayorEsMejor: false }, escala: [0, 40], apoyo: [{ valor: usdCorto(VALOR_INVENTARIO.fisico), texto: "USD en inventario" }, { valor: usdCorto(totalInmovilizado()), texto: "USD inmovilizados (+30 d)" }], disponibilidad: "D3" },
+    { id: "riesgo", dimension: "riesgo", nombre: "Valor económico en riesgo", pregunta: "¿Cuánto dinero puede convertirse en pérdida?", valor: riesgo.total, unidad: "USD", cambio: cambio("−6.2 %", true), apoyo: riesgo.componentes.map((c) => ({ valor: usdCorto(c.usd), texto: c.corto })), disponibilidad: "D2" },
+    { id: "exactitud", dimension: "riesgo", nombre: "Exactitud de inventario", pregunta: "¿Qué tan confiable es el sistema frente a lo físico?", valor: lecturas ? pct(exactitud.coinciden, lecturas) : 100, unidad: "%", cambio: cambio("+1.1 pp", true), meta: { texto: "Meta ≥ 98 %", valor: 98, mayorEsMejor: true }, escala: [0, 100], apoyo: [{ valor: fmt(exactitud.coinciden), texto: "Lecturas que coinciden" }, { valor: fmt(lecturas), texto: "Lecturas de lote" }], disponibilidad: "D2" },
+  ];
+}
+
+export const cumpleMeta = (k: Kpi) => (k.meta ? (k.meta.mayorEsMejor ? k.valor >= k.meta.valor : k.valor <= k.meta.valor) : true);
+
+/** Diferencias de lote del mes (las de ejemplo más las que registre hoy el PDA). */
+export const COL_EXACTITUD = ["Artículo", "Lote", "Ubicación", "Sistema", "Físico", "Diferencia", "Último movimiento", "Incidencia"];
+export const DIFERENCIAS_MES: string[][] = [
+  ["Harina Gold Mills dura · HAR-GM50", "L230825", "PB-R02-N1-P05", "12 sacos", "11 sacos", "−1", "surtido 29 sep", "CNT-0031"],
+  ["Queso crema · QCR-10", "L220925", "PB-CF2", "4 cajas", "5 cajas", "+1", "acomodo 28 sep", "CNT-0033"],
+  ["Crema de leche UHT · CRE-UHT", "L011025", "PB-CF1", "8 cajas", "7 cajas", "−1", "surtido 27 sep", "CNT-0035"],
+  ["Levadura seca · LEV-10", "L200925", "PA-R12-N2-P05", "5 cajas", "2 cajas", "−3", "surtido 25 sep", "CNT-0042"],
+  ["Cacao en polvo · CAC-05", "L100925", "PA-R12-N3-P01", "8 cajas", "6 cajas", "−2", "conteo 24 sep", "CNT-0047"],
+  ["Chocolate cobertura · CHO-05", "L120925", "PB-R07-N2-P03", "10 cajas", "10 cajas", "lote distinto", "acomodo 22 sep", "INC-0896"],
+  ["Avena en hojuelas · AVE-10", "L090925", "PB-R03-N1-P04", "6 cajas", "7 cajas", "+1", "recepción 19 sep", "CNT-0028"],
+  ["Huevo líquido · HUE-LIQ", "L260925", "PB-CF2", "5 cajas", "4 cajas", "−1", "surtido 17 sep", "CNT-0026"],
+  ["Mantequilla sin sal · MAN-10", "L240925", "PB-CF2", "3 cajas", "3 cajas", "lote distinto", "acomodo 15 sep", "INC-0881"],
+];
+
+// ── Operación: costo, retrasos, negocio ─────────────────────────
 
 export const COSTO_PROCESO = [
   { proceso: "Recepción", usd: 4820, horas: 566, personas: 2, porUnidad: 2.63, historia: [4510, 4690, 4820] },
@@ -117,16 +414,14 @@ export const VENTANAS_RETRASO = [
   { id: 12, texto: "12 semanas", factor: 0.86 },
 ];
 
-// ── Negocio y canales ───────────────────────────────────────────
-
 export type Alcance = "hoy" | "semana" | "mes";
-export const NEGOCIO: { nombre: string; valores: Record<Alcance, number>; usd?: boolean }[] = [
-  { nombre: "Venta despachada", valores: { hoy: 14200, semana: 96800, mes: 418600 }, usd: true },
-  { nombre: "Pedidos a tiendas", valores: { hoy: 14, semana: 91, mes: 392 } },
-  { nombre: "E-commerce", valores: { hoy: 7, semana: 39, mes: 168 } },
-  { nombre: "Pedidos especiales", valores: { hoy: 2, semana: 17, mes: 71 } },
-  { nombre: "Órdenes de producción", valores: { hoy: 5, semana: 30, mes: 128 } },
-  { nombre: "Órdenes de compra", valores: { hoy: 8, semana: 50, mes: 214 } },
+export const NEGOCIO: { nombre: string; valores: Record<Alcance, number>; usd?: boolean; fuente: string }[] = [
+  { nombre: "Venta despachada", valores: { hoy: 14200, semana: 96800, mes: 418600 }, usd: true, fuente: "ERP / ventas" },
+  { nombre: "Pedidos a tiendas", valores: { hoy: 14, semana: 91, mes: 392 }, fuente: "WMS" },
+  { nombre: "E-commerce", valores: { hoy: 7, semana: 39, mes: 168 }, fuente: "Plataforma e-commerce" },
+  { nombre: "Pedidos especiales", valores: { hoy: 2, semana: 17, mes: 71 }, fuente: "Ventas" },
+  { nombre: "Órdenes de producción", valores: { hoy: 5, semana: 30, mes: 128 }, fuente: "Producción" },
+  { nombre: "Órdenes de compra", valores: { hoy: 8, semana: 50, mes: 214 }, fuente: "ERP / compras" },
 ];
 export const CUMPLIMIENTO_CANAL: { canal: string; valores: Record<Alcance, number> }[] = [
   { canal: "Áreas de producción", valores: { hoy: 68, semana: 70, mes: 71 } },
@@ -136,28 +431,21 @@ export const CUMPLIMIENTO_CANAL: { canal: string; valores: Record<Alcance, numbe
 ];
 export const META_CUMPLIMIENTO = 95;
 
-// ── Inventario por cámara y fugas ───────────────────────────────
+// ── Top excepciones por impacto (septiembre) ────────────────────
 
-export const VALOR_CAMARA = [
-  { camara: "Seco", mp: 318000, insumos: 142000, pt: 96000 },
-  { camara: "Refrigerado", mp: 186000, insumos: 74000, pt: 58000 },
-  { camara: "Congelado", mp: 121000, insumos: 38000, pt: 44000 },
-  { camara: "Empaque", mp: 0, insumos: 173000, pt: 0 },
+/** Lo confirmado sale del detalle de cada causa; lo que sigue en investigación no cuenta como pérdida. */
+export const TOP_EXCEPCIONES = [
+  { articulo: "Piña galón", codigo: "ING-PIÑA-001", tipo: "Diferencia físico-sistema", cantidad: "48 galones", usd: 3910, estado: "En investigación", confirmada: false, responsable: "Supervisor de almacén" },
+  { articulo: "Harina Gold Mills dura", codigo: "HAR-GM50", tipo: "Desabasto", cantidad: "4,830 KG", usd: 3480, estado: "Confirmada", confirmada: true, responsable: "Compras" },
+  { articulo: "Azúcar refinada", codigo: "AZU-R25", tipo: "Desabasto", cantidad: "2,780 KG", usd: 2640, estado: "Confirmada", confirmada: true, responsable: "Compras" },
+  { articulo: "Aceite vegetal", codigo: "ACE-18", tipo: "Daño", cantidad: "40 LT", usd: 1870, estado: "Merma confirmada", confirmada: true, responsable: "Almacén" },
+  { articulo: "Producto de panadería", codigo: "PT-PAN-001", tipo: "Merma", cantidad: "310 PZA", usd: 1540, estado: "Merma confirmada", confirmada: true, responsable: "Panadería" },
+  { articulo: "Crema de leche UHT", codigo: "CRE-UHT", tipo: "Caducidad", cantidad: "24 LT", usd: 1210, estado: "Merma confirmada", confirmada: true, responsable: "Calidad" },
+  { articulo: "Queso crema", codigo: "QCR-10", tipo: "Caducidad", cantidad: "10 KG", usd: 640, estado: "Merma confirmada", confirmada: true, responsable: "Calidad" },
 ];
 
-export const FUGAS = [
-  { articulo: "Crema de leche UHT", codigo: "CRE-UHT", causa: "Caducidad", usd: 4820, area: "Dulcería" },
-  { articulo: "Piña galón", codigo: "ING-PIÑA-001", causa: "No se encontró", usd: 3910, area: "Dulcería" },
-  { articulo: "Harina Gold Mills dura", codigo: "HAR-GM50", causa: "No teníamos", usd: 3480, area: "Panadería" },
-  { articulo: "Azúcar refinada", codigo: "AZU-R25", causa: "No teníamos", usd: 2640, area: "Panadería" },
-  { articulo: "Aceite vegetal", codigo: "ACE-18", causa: "Dañado", usd: 1870, area: "Cocina" },
-  { articulo: "Producto de panadería", codigo: "PT-PAN-001", causa: "Caducidad", usd: 1540, area: "Panadería" },
-  { articulo: "Queso crema", codigo: "QCR-10", causa: "Caducidad", usd: 1210, area: "Dulcería" },
-];
+// ── En vivo: excepciones que escalan, actividad y compromisos ───
 
-// ── En vivo: excepciones que escalan, actividad y órdenes abiertas ──
-
-/** Precio de referencia por unidad (USD) para valuar pedidos y lotes en la maqueta. */
 const PRECIO: Record<string, number> = {
   "HAR-GM50": 0.72, "AZU-R25": 0.95, "SAL-25": 0.4, "CRE-UHT": 3.1, "QCR-10": 6.8, "HUE-LIQ": 4.2, "ACE-18": 2.6, "CAC-05": 9.5,
   "EMP-C10": 0.45, "EMP-B10": 0.18, "VAI-04": 22, "LEV-10": 7.5, "LEC-P25": 5.4, "HAR-INT": 0.9, "AVE-10": 1.9, "BOL-PAN": 0.05,
@@ -170,17 +458,25 @@ const minutosAhora = () => {
   return h * 60 + m;
 };
 
+/** Solo escala lo que supera las reglas: afecta producción o inocuidad, o vale más de USD 1,000. */
+export const REGLA_ESCALAMIENTO = "Solo escala lo que afecta inocuidad o producción, o vale más de USD 1,000";
+
 export interface Escalada {
   id: string;
   n: number;
   titulo: string;
   texto: string;
   tono: "critico" | "alerta";
+  impacto: number;
+  antiguedad: string;
+  responsable: string;
+  estado: string;
+  siguiente: string;
   columnas: string[];
   filas: string[][];
 }
 
-export function escaladas(estadosLote: Record<string, EstadoLote>, estados: Record<string, EstadoTrabajo>, pedidos: PedidoArea[], recepciones: RegistroRecepcion[]): Escalada[] {
+export function escaladas(estadosLote: Record<string, EstadoLote>, estados: Record<string, EstadoTrabajo>, pedidos: PedidoArea[], recepciones: RegistroRecepcion[], incidencias: Incidencia[]): Escalada[] {
   const vencidos = INVENTARIO.filter((b) => diasPara(b) < 0 && !estadosLote[b.id]);
   const ahora = minutosAhora();
   const vencidosSurtido = trabajosDelDia(pedidos).filter((t) => {
@@ -192,62 +488,103 @@ export function escaladas(estadosLote: Record<string, EstadoLote>, estados: Reco
     if (r.estado === "completa" || r.estado === "cerrada_corta") return false;
     if (recepciones.some((x) => x.oc === o.oc)) return false;
     if (o.fechaProgramada < HOY) return true;
-    return o.fechaProgramada === HOY && !!o.cita && minutosDelDia(o.cita.padStart(5, "0")) < ahora;
+    return o.fechaProgramada === HOY && !!o.cita && minutosDelDia(o.cita) < ahora;
   });
+  const valorOc = (oc: (typeof citas)[number]) => Math.round(oc.productos.reduce((s, p) => s + p.cajas * p.unidadesPorCaja * 2.4, 0));
+  // Material retenido: lo que el PDA mandó a cuarentena y sigue sin decisión, más los de ejemplo.
+  const retenidoVivo = incidencias.filter((i) => esPendiente(i) && (i.tipo === "vida_util" || (i.tipo === "dano" && i.destino !== "disponible")));
+  const masAntiguo = vencidos.length ? Math.max(...vencidos.map((b) => -diasPara(b))) : 0;
   return [
     {
       id: "inocuidad",
       n: vencidos.length,
-      titulo: "Inocuidad",
-      texto: "lotes vencidos disponibles",
+      titulo: "Inventario vencido disponible",
+      texto: "lotes vencidos que aún se pueden surtir",
       tono: "critico",
-      columnas: ["Artículo", "Lote", "Posición", "Vencido"],
-      filas: vencidos.map((b) => [insumoDe(b.sku).nombre, b.lote, b.posicion, `hace ${-diasPara(b)} d`]),
+      impacto: vencidos.reduce((s, b) => s + valorLote(b.id), 0),
+      antiguedad: masAntiguo ? `${masAntiguo} d el más antiguo` : "—",
+      responsable: "Calidad",
+      estado: vencidos.length ? "Abierta" : "Sin pendientes",
+      siguiente: "Bloquear el lote y decidir destino",
+      columnas: ["Artículo", "Lote", "Ubicación", "Vencido", "USD"],
+      filas: vencidos.map((b) => [insumoDe(b.sku).nombre, b.lote, b.posicion, `hace ${-diasPara(b)} d`, fmt(valorLote(b.id))]),
     },
     {
       id: "produccion",
       n: 1,
-      titulo: "Producción",
-      texto: "Panadería sin cobertura para mañana",
+      titulo: "Desabasto que afecta producción",
+      texto: "plan de mañana sin cobertura",
       tono: "critico",
-      columnas: ["Área", "Insumo", "Falta para el plan", "Desde"],
-      filas: [["Panadería", "Harina integral", "45 KG", "mañana 08:57"]],
+      impacto: 1380,
+      antiguedad: "5 h",
+      responsable: "Compras",
+      estado: "Abierta",
+      siguiente: "Surtir de otra existencia o comprar hoy",
+      columnas: ["Área", "Insumo", "Falta", "Compromiso", "USD"],
+      filas: [["Panadería", "Harina integral", "45 KG", "mañana 08:57", "1,380"]],
     },
     {
       id: "surtido",
       n: vencidosSurtido.length,
-      titulo: "Surtido",
-      texto: "compromisos vencidos hoy",
+      titulo: "Pedidos críticos incumplidos",
+      texto: "compromisos de surtido vencidos hoy",
       tono: "critico",
-      columnas: ["Pedido", "Destino", "Debía salir", "Estado"],
-      filas: vencidosSurtido.map((t) => [t.id, t.nombre, t.sale === "ahora" ? "urgente" : t.sale, estadoDe(t.id, estados).estado === "surtiendo" ? "Surtiendo" : "En cola"]),
+      impacto: Math.round(vencidosSurtido.reduce((s, t) => s + t.lineas.reduce((a, l) => a + valorLinea(l.sku, l.pidio), 0), 0)),
+      antiguedad: vencidosSurtido.length ? "hoy" : "—",
+      responsable: "Supervisor de almacén",
+      estado: vencidosSurtido.length ? "Abierta" : "Sin pendientes",
+      siguiente: "Reforzar el turno de surtido",
+      columnas: ["Pedido", "Destino", "Debía salir", "Estado", "USD"],
+      filas: vencidosSurtido.map((t) => [t.id, t.nombre, t.sale === "ahora" ? "urgente" : t.sale, estadoDe(t.id, estados).estado === "surtiendo" ? "Surtiendo" : "En cola", fmt(t.lineas.reduce((a, l) => a + valorLinea(l.sku, l.pidio), 0))]),
     },
     {
       id: "proveedor",
       n: citas.length,
-      titulo: "Proveedor",
+      titulo: "OC crítica atrasada",
       texto: "citas vencidas sin llegar",
       tono: "alerta",
-      columnas: ["OC", "Proveedor", "Cita", "Retraso"],
-      filas: citas.map((o) => [o.oc, o.proveedor, `${fechaConAnio(o.fechaProgramada)}${o.cita ? ` ${o.cita}` : ""}`, o.fechaProgramada < HOY ? `${diasEntre(o.fechaProgramada, HOY)} d` : `${Math.floor((ahora - minutosDelDia(o.cita!.padStart(5, "0"))) / 60)} h`]),
+      impacto: citas.reduce((s, o) => s + valorOc(o), 0),
+      antiguedad: citas.some((o) => o.fechaProgramada < HOY) ? `${Math.max(...citas.map((o) => diasEntre(o.fechaProgramada, HOY)))} d la más antigua` : citas.length ? "hoy" : "—",
+      responsable: "Compras",
+      estado: citas.length ? "Abierta" : "Sin pendientes",
+      siguiente: "Llamar al proveedor y reprogramar la cita",
+      columnas: ["OC", "Proveedor", "Cita", "Retraso", "USD"],
+      filas: citas.map((o) => [o.oc, o.proveedor, `${fechaConAnio(o.fechaProgramada)}${o.cita ? ` ${o.cita}` : ""}`, o.fechaProgramada < HOY ? `${diasEntre(o.fechaProgramada, HOY)} d` : `${Math.max(1, Math.floor((ahora - minutosDelDia(o.cita!)) / 60))} h`, fmt(valorOc(o))]),
     },
     {
-      id: "ajustes",
-      n: 431,
-      titulo: "Ajustes",
-      texto: "sin causa clasificada",
+      id: "diferencia",
+      n: 2,
+      titulo: "Diferencia material de inventario",
+      texto: "diferencias en investigación",
       tono: "alerta",
-      columnas: ["Tipo de ajuste", "Registros", "USD"],
-      filas: [["Texto libre en conteo", "286", "6,940"], ["Diferencia de recepción", "98", "2,310"], ["Corrección manual", "47", "1,120"]],
+      impacto: 6050,
+      antiguedad: "3 d",
+      responsable: "Supervisor de almacén",
+      estado: "En investigación",
+      siguiente: "Contar la posición antes de ajustar",
+      columnas: ["Artículo", "Ubicación", "Sistema", "Físico", "USD"],
+      filas: [
+        ["Piña galón", "PB-CF3-02", "48 galones", "0", "3,910"],
+        ["Harina integral", "PA-R12-N1-P03", "6 sacos", "4 sacos", "2,140"],
+      ],
     },
     {
-      id: "capital",
-      n: 10,
-      titulo: "Capital",
-      texto: "días sobre la meta de inventario",
+      id: "retenido",
+      n: 2 + retenidoVivo.length,
+      titulo: "Material retenido de alto impacto",
+      texto: "lotes en cuarentena sin decisión",
       tono: "alerta",
-      columnas: ["Clase", "Rotación", "Meta", "USD de más"],
-      filas: [["Clase B", "31 d", "24 d", "98,800"], ["Clase C", "68 d", "45 d", "105,700"]],
+      impacto: 4240,
+      antiguedad: "2 d",
+      responsable: "Calidad",
+      estado: "Esperando decisión",
+      siguiente: "Liberar o rechazar con Calidad",
+      columnas: ["Artículo", "Lote", "Motivo", "Incidencia", "USD"],
+      filas: [
+        ["Mantequilla sin sal", "L-2609M", "Daño en recepción", "—", "2,460"],
+        ["Huevo líquido pasteurizado", "L-2609E", "Vida útil corta", "—", "1,780"],
+        ...retenidoVivo.map((i) => [i.titulo, i.oc, i.tipo === "vida_util" ? "Vida útil corta" : "Daño", i.id, "—"]),
+      ],
     },
   ];
 }
@@ -260,10 +597,13 @@ export interface Actividad {
   tono: "critico" | "alerta" | "info";
 }
 
-/** La operación de hoy: incidencias, urgencias, recepciones y salidas, más lo de la mañana. */
+/** Tipos de incidencia que importan a Dirección (no todo el registro técnico). */
+const RELEVANTES = new Set(["vida_util", "lote_distinto", "diferencia_area", "faltante_surtido", "dano", "saldo"]);
+
+/** El pulso de la operación: lo relevante de hoy, no cada movimiento. */
 export function actividad(incidencias: Incidencia[], estados: Record<string, EstadoTrabajo>, pedidos: PedidoArea[], recepciones: RegistroRecepcion[]): Actividad[] {
   const lista: Actividad[] = [];
-  for (const i of incidencias) lista.push({ ts: i.creada, hora: i.hora, titulo: i.titulo, detalle: `${i.id} · ${i.oc}`, tono: i.semaforo === "rojo" ? "critico" : "alerta" });
+  for (const i of incidencias) if (i.semaforo === "rojo" || RELEVANTES.has(i.tipo)) lista.push({ ts: i.creada, hora: i.hora, titulo: i.titulo, detalle: `${i.id} · ${i.oc}`, tono: i.semaforo === "rojo" ? "critico" : "alerta" });
   for (const p of pedidos) {
     const ap = estados[p.id]?.aprobacion;
     if (ap) lista.push({ ts: ap.solicitadaMs, hora: ap.solicitada, titulo: `Urgencia de ${p.nombre}${ap.decision ? (ap.decision === "aprobada" ? " aprobada" : ap.decision === "ventana" ? " pasada a la ventana" : " rechazada") : " por aprobar"}`, detalle: `${ap.quien ?? ap.aprobador} · ${p.id}`, tono: ap.decision === "rechazada" || !ap.decision ? "alerta" : "info" });
@@ -271,14 +611,13 @@ export function actividad(incidencias: Incidencia[], estados: Record<string, Est
   for (const r of recepciones) if (r.estado === "cerrada" && r.fin) lista.push({ ts: r.fin, hora: new Date(r.fin).toTimeString().slice(0, 5), titulo: `Recepción ${r.oc} cerrada`, detalle: `${r.proveedor} · ${r.bultos ?? 0} bultos`, tono: "info" });
   for (const t of trabajosDelDia(pedidos)) {
     const e = estadoDe(t.id, estados);
-    if (e.salidaMs) lista.push({ ts: e.salidaMs, hora: new Date(e.salidaMs).toTimeString().slice(0, 5), titulo: `${t.nombre}: salió del almacén`, detalle: `${t.contenedor}`, tono: "info" });
+    if (e.confirmado) lista.push({ ts: Date.now(), hora: e.confirmado.hora, titulo: `Entrega a ${t.nombre} ${e.confirmado.diferencia ? "con diferencia" : "confirmada"}`, detalle: `${t.contenedor} · ${e.confirmado.quien}`, tono: e.confirmado.diferencia ? "alerta" : "info" });
   }
-  // Lo de la mañana (datos de ejemplo), para que el panel no arranque vacío.
   const base = new Date(`${HOY}T00:00:00`).getTime();
   const ejemplo = (hora: string, titulo: string, detalle: string, tono: Actividad["tono"]) => ({ ts: base + minutosDelDia(hora) * 6e4, hora, titulo, detalle, tono });
   lista.push(
     ejemplo("07:25", "Recepción OC-7139 cerrada", "Pastas del Istmo · 10 sacos de harina", "info"),
-    ejemplo("09:31", "Urgencia de Panadería aprobada", `Rosa Villalaz · levadura`, "info"),
+    ejemplo("09:31", "Urgencia de Panadería aprobada", "Rosa Villalaz · levadura", "info"),
     ejemplo("06:50", "Conteo cíclico cerrado", "Pasillo PB-CF · 95.4 % de exactitud", "info"),
   );
   return lista.sort((a, b) => b.ts - a.ts).slice(0, 8);
@@ -289,7 +628,6 @@ export interface Compromiso {
   tipo: "Compra" | "Surtido" | "Especial" | "E-commerce";
   destino: string;
   compromiso: string;
-  /** Para ordenar por fecha y hora. */
   orden: number;
   estado: string;
   tono: "critico" | "alerta" | "info" | "neutro";
@@ -309,10 +647,9 @@ export function compromisos(estados: Record<string, EstadoTrabajo>, pedidos: Ped
     .map((o) => {
       const r = resumenOrden(o, ordenesStore.get());
       const enCurso = recepciones.some((x) => x.oc === o.oc && x.estado === "en_curso");
-      const cita = o.cita ? minutosDelDia(o.cita.padStart(5, "0")) : 0;
+      const cita = o.cita ? minutosDelDia(o.cita) : 0;
       const dias = diasEntre(HOY, o.fechaProgramada);
       const vencida = !enCurso && r.estado === "nueva" && (dias < 0 || (dias === 0 && cita < ahora));
-      const usdOc = o.productos.reduce((s, p) => s + p.cajas * p.unidadesPorCaja * 2.4, 0);
       return {
         folio: o.oc,
         tipo: "Compra" as const,
@@ -321,7 +658,7 @@ export function compromisos(estados: Record<string, EstadoTrabajo>, pedidos: Ped
         orden: dias * 1440 + cita,
         estado: enCurso ? "Recibiendo" : r.estado === "parcial" ? "Recibida parcial" : vencida ? (dias < 0 ? `Cita vencida ${-dias} d` : `Cita vencida ${Math.max(1, Math.floor((ahora - cita) / 60))} h`) : "Por recibir",
         tono: vencida ? ("critico" as const) : r.estado === "parcial" ? ("alerta" as const) : ("info" as const),
-        usd: Math.round(usdOc),
+        usd: Math.round(o.productos.reduce((s, p) => s + p.cajas * p.unidadesPorCaja * 2.4, 0)),
       };
     });
   const surtidos: Compromiso[] = trabajosDelDia(pedidos)
@@ -353,8 +690,9 @@ export function useDireccionEnVivo() {
   const exactitud = exactitudStore.use();
   ordenesStore.use();
   return {
+    estadosLote,
     exactitud,
-    escaladas: escaladas(estadosLote, estados, pedidos, recepciones),
+    escaladas: escaladas(estadosLote, estados, pedidos, recepciones, incidencias),
     actividad: actividad(incidencias, estados, pedidos, recepciones),
     compromisos: compromisos(estados, pedidos, recepciones),
   };
