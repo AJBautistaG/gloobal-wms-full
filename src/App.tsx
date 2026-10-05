@@ -80,7 +80,7 @@ function Rutas() {
         }
       />
       <Route
-        path="/direccion/:seccion?"
+        path="/direccion"
         element={
           <Protegida>
             <Direccion />

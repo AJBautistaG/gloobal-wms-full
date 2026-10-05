@@ -1,30 +1,11 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink, useNavigate, useParams } from "react-router-dom";
-import {
-  Bell,
-  BookOpen,
-  CalendarClock,
-  ChevronLeft,
-  CircleDollarSign,
-  Factory,
-  FileText,
-  Gauge,
-  LineChart,
-  LogOut,
-  Moon,
-  Settings,
-  ShieldAlert,
-  Store,
-  Sun,
-  Truck,
-  Wallet,
-  X,
-} from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Bell, CalendarClock, LogOut, Moon, Sun, X } from "lucide-react";
 import { usePda } from "@/context/PdaContext";
 import { analisisDe } from "@/data/analisisDireccion";
 import type { EstadoLote } from "@/data/caducidad";
 import { AREAS_DIR, CANALES, DIRECTOR, PERIODOS, useDireccionEnVivo, type Escalada, type Periodo } from "@/data/direccion";
-import { useFechaHoy } from "@/lib/fecha";
+import { FechaHoy, useFechaHoy } from "@/lib/fecha";
 import { useSesion } from "@/lib/sesion";
 import { cn } from "@/lib/utils";
 import { TablaSimple } from "../supervisor/Graficas";
@@ -32,36 +13,9 @@ import { Fuente, Selector, type Lateral } from "./PiezasDireccion";
 import { Torre } from "./TorreDireccion";
 
 /**
- * Dirección General (módulo de Lovable): la Torre de Control con resultado, capital de trabajo y
- * riesgo. Las demás secciones del menú quedan como "próximamente", igual que en el mock.
+ * Torre de Control de Dirección General. Misma estructura que la torre del supervisor: encabezado
+ * fijo con filtros y el tablero debajo, sin menú lateral.
  */
-
-const SECCIONES: { grupo: string; items: { ruta: string; nombre: string; icono: typeof Gauge; descripcion: string; badge?: boolean }[] }[] = [
-  {
-    grupo: "Dirección",
-    items: [
-      { ruta: "", nombre: "Torre de Control", icono: LineChart, descripcion: "" },
-      { ruta: "margen", nombre: "Resultado e impacto", icono: CircleDollarSign, descripcion: "Aquí vivirá el impacto económico de excepciones por causa, artículo y canal, y el margen potencial no capturado por desabasto." },
-      { ruta: "capital", nombre: "Capital de trabajo", icono: Wallet, descripcion: "Aquí vivirán los días de inventario, la rotación por clase y el capital inmovilizado." },
-    ],
-  },
-  {
-    grupo: "Operación",
-    items: [
-      { ruta: "abasto", nombre: "Abasto y proveedores", icono: Truck, descripcion: "Aquí vivirán el OTIF por proveedor, las citas y el saldo de las órdenes de compra." },
-      { ruta: "produccion", nombre: "Producción", icono: Factory, descripcion: "Aquí vivirá el cumplimiento del plan por área y la cobertura de insumos." },
-      { ruta: "canales", nombre: "Tiendas y canales", icono: Store, descripcion: "Aquí vivirán el fill rate y el cumplimiento a la hora prometida por canal." },
-    ],
-  },
-  {
-    grupo: "Gobierno",
-    items: [
-      { ruta: "riesgo", nombre: "Riesgo y cumplimiento", icono: ShieldAlert, descripcion: "Aquí vivirán las excepciones de inocuidad, auditoría y control interno.", badge: true },
-      { ruta: "reportes", nombre: "Reportes", icono: FileText, descripcion: "Aquí vivirán los reportes para el consejo y los cierres de mes." },
-      { ruta: "config", nombre: "Configuración", icono: Settings, descripcion: "Aquí vivirán las metas, umbrales y destinatarios de alertas." },
-    ],
-  },
-];
 
 // ── Panel lateral: Detalle y Análisis ───────────────────────────
 
@@ -171,7 +125,6 @@ function PanelLateral({ l, onCerrar, vivo }: { l: Lateral; onCerrar: () => void;
 // ── Página ──────────────────────────────────────────────────────
 
 export default function Direccion() {
-  const { seccion = "" } = useParams();
   const { oscuro, setOscuro } = usePda();
   const sesion = useSesion();
   const navegar = useNavigate();
@@ -182,151 +135,100 @@ export default function Direccion() {
   const [lateral, setLateral] = useState<Lateral | null>(null);
   const [campana, setCampana] = useState(false);
   const vivo = useDireccionEnVivo();
-  const fecha = useFechaHoy();
-  const actual = SECCIONES.flatMap((g) => g.items).find((i) => i.ruta === seccion) ?? SECCIONES[0].items[0];
-  const escaladasAbiertas = vivo.escaladas.filter((e) => e.n > 0 && e.tono === "critico");
+  const criticas = vivo.escaladas.filter((e) => e.n > 0 && e.tono === "critico");
 
   useEffect(() => {
-    document.title = `${actual.nombre} · Dirección · Momi WMS`;
+    document.title = "Torre de Control · Dirección · Momi WMS";
     return () => {
       document.title = "Momi PDA";
     };
-  }, [actual.nombre]);
+  }, []);
 
   return (
-    <div className="flex min-h-screen bg-muted">
+    <div className="min-h-screen bg-muted">
       {lateral && <PanelLateral l={lateral} onCerrar={() => setLateral(null)} vivo={vivo} />}
-      <nav aria-label="Secciones de Dirección" className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-border bg-card px-3 py-4 lg:flex">
-        <Link to="/direccion" className="mb-5 px-2">
-          <img src="/momi-logo.png" alt="Momi" className="h-7 w-auto dark:brightness-0 dark:invert" />
-          <span className="mt-1 block text-[11px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">WMS · Dirección</span>
-        </Link>
-        {SECCIONES.map((g) => (
-          <div key={g.grupo} className="mb-4">
-            <p className="mb-1 px-2 text-[11px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">{g.grupo}</p>
-            {g.items.map((i) => {
-              const Icono = i.icono;
-              return (
-                <NavLink
-                  key={i.ruta}
-                  to={`/direccion${i.ruta ? `/${i.ruta}` : ""}`}
-                  end
-                  className={({ isActive }) => cn("flex min-h-9 items-center gap-2.5 rounded-lg px-2 text-sm", isActive ? "bg-primary-soft font-semibold text-primary" : "text-foreground hover:bg-muted")}
-                >
-                  <Icono size={16} aria-hidden />
-                  <span className="flex-1">{i.nombre}</span>
-                  {i.badge && escaladasAbiertas.length > 0 && <span className="grid size-5 place-items-center rounded-full bg-critico text-[11px] font-bold text-white">{escaladasAbiertas.length}</span>}
-                </NavLink>
-              );
-            })}
-          </div>
-        ))}
-        <p className="mt-auto px-2 text-[11px] text-muted-foreground">Maqueta con datos de ejemplo</p>
-      </nav>
-
-      <div className="min-w-0 flex-1">
-        <header className="border-b border-border bg-card">
-          <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-3 text-xs text-muted-foreground sm:px-6">
-            <span>
-              Dirección › <span className="font-semibold text-primary">{actual.nombre}</span>
-            </span>
-            <span>Datos actualizados el {fecha}</span>
-          </div>
-          <div className="flex flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
-            <div className="mr-auto min-w-0">
-              <h1 className="font-display text-2xl font-extrabold">{actual.nombre}</h1>
-              <p className="text-sm text-muted-foreground">
-                Dirección General · resultado, capital y pérdida, y riesgo · {area === AREAS_DIR[0] ? "todas las áreas" : area} · {canal === CANALES[0] ? "todos los canales" : canal}
+      <header className="sticky top-0 z-30 border-b border-border bg-card/95 backdrop-blur">
+        <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-4 px-6 py-3">
+          <div className="flex items-center gap-3">
+            <span className="grid size-10 place-items-center rounded-xl bg-primary font-display text-lg font-extrabold text-primary-foreground">M</span>
+            <div>
+              <p className="font-display text-lg leading-tight font-extrabold">Torre de Control · Dirección</p>
+              <p className="text-xs text-muted-foreground">
+                Momi WMS · Dirección General · <FechaHoy />
               </p>
-              <span className="mt-1 inline-block rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-semibold text-primary">Maqueta con datos de ejemplo</span>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <label className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-1">
-                <CalendarClock size={15} className="text-muted-foreground" aria-hidden />
-                <span className="leading-tight">
-                  <select aria-label="Periodo" value={periodo} onChange={(e) => setPeriodo(e.target.value as Periodo)} className="bg-transparent text-sm font-semibold">
-                    {PERIODOS.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.texto}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="block text-[11px] text-muted-foreground">{PERIODOS.find((p) => p.id === periodo)!.rango}</span>
-                </span>
-              </label>
-              <Selector etiqueta="Área" valor={area} onCambio={setArea} opciones={AREAS_DIR.map((a) => ({ id: a, texto: a }))} />
-              <Selector etiqueta="Canal" valor={canal} onCambio={setCanal} opciones={CANALES.map((c) => ({ id: c, texto: c }))} />
-              <div className="relative">
-                <button type="button" onClick={() => setCampana(!campana)} aria-label={`Alertas para Dirección: ${escaladasAbiertas.length}`} className="relative grid size-10 place-items-center rounded-full border border-border bg-card">
-                  <Bell size={17} aria-hidden />
-                  {escaladasAbiertas.length > 0 && <span className="absolute -top-1 -right-1 grid size-5 place-items-center rounded-full bg-critico text-[11px] font-bold text-white">{escaladasAbiertas.length}</span>}
-                </button>
-                {campana && (
-                  <div className="absolute right-0 z-40 mt-2 w-80 rounded-2xl border border-border bg-card p-3 shadow-xl">
-                    <p className="mb-2 text-sm font-semibold">Escala a Dirección</p>
-                    {escaladasAbiertas.length ? (
-                      <ul className="space-y-1.5 text-sm">
-                        {escaladasAbiertas.map((e) => (
-                          <li key={e.id}>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setCampana(false);
-                                setLateral({ titulo: `${e.titulo} · ${e.n} ${e.texto}`, detalle: e.filas.length ? <TablaSimple columnas={e.columnas} filas={e.filas} /> : null, panel: "excepciones" });
-                              }}
-                              className="w-full rounded-lg bg-critico/10 px-3 py-2 text-left"
-                            >
-                              <b className="text-critico">{e.n}</b> · {e.titulo}: {e.texto}
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">Nada crítico ahora.</p>
-                    )}
-                  </div>
-                )}
-              </div>
-              <button type="button" onClick={() => setOscuro(!oscuro)} aria-label={oscuro ? "Modo claro" : "Modo oscuro"} className="grid size-10 place-items-center rounded-full border border-border bg-card">
-                {oscuro ? <Sun size={17} aria-hidden /> : <Moon size={17} aria-hidden />}
-              </button>
-              <div className="hidden items-center gap-2 pl-1 sm:flex">
-                <span className="grid size-10 place-items-center rounded-full bg-primary-soft text-sm font-bold text-primary">{yo.nombre.split(" ").map((p) => p[0]).join("").slice(0, 2)}</span>
-                <div className="text-sm leading-tight">
-                  <p className="font-semibold">{yo.nombre}</p>
-                  <p className="text-xs text-muted-foreground">{yo.puesto}</p>
-                </div>
-              </div>
-              <button type="button" onClick={() => navegar("/login?salir=1", { replace: true })} aria-label="Cerrar sesión" title="Cerrar sesión" className="grid size-10 place-items-center rounded-full border border-border bg-card">
-                <LogOut size={17} aria-hidden />
-              </button>
             </div>
           </div>
-          {/* En pantallas chicas, el menú de secciones va arriba. */}
-          <nav aria-label="Secciones de Dirección" className="flex gap-1 overflow-x-auto px-4 pb-2 lg:hidden">
-            {SECCIONES.flatMap((g) => g.items).map((i) => (
-              <NavLink key={i.ruta} to={`/direccion${i.ruta ? `/${i.ruta}` : ""}`} end className={({ isActive }) => cn("shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold", isActive ? "bg-primary-soft text-primary" : "text-muted-foreground")}>
-                {i.nombre}
-              </NavLink>
-            ))}
-          </nav>
-        </header>
-
-        <main className="p-4 sm:p-6">
-          {seccion === "" ? (
-            <Torre periodo={periodo} abrir={setLateral} />
-          ) : (
-            <div className="mx-auto mt-16 max-w-md rounded-2xl border border-dashed border-border bg-card p-8 text-center">
-              <BookOpen size={28} className="mx-auto text-muted-foreground" aria-hidden />
-              <p className="mt-3 font-display text-lg font-extrabold">Esta pantalla todavía no está en la maqueta</p>
-              <p className="mt-1 text-sm text-muted-foreground">{actual.descripcion}</p>
-              <Link to="/direccion" className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-primary">
-                <ChevronLeft size={15} aria-hidden /> Volver a la Torre de Control
-              </Link>
+          <span className="rounded-full bg-primary-soft px-3 py-1 text-xs font-semibold text-primary">Maqueta con datos de ejemplo</span>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-1">
+              <CalendarClock size={15} className="text-muted-foreground" aria-hidden />
+              <span className="leading-tight">
+                <select aria-label="Periodo" value={periodo} onChange={(e) => setPeriodo(e.target.value as Periodo)} className="bg-transparent text-sm font-semibold">
+                  {PERIODOS.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.texto}
+                    </option>
+                  ))}
+                </select>
+                <span className="block text-[11px] text-muted-foreground">{PERIODOS.find((p) => p.id === periodo)!.rango}</span>
+              </span>
+            </label>
+            <Selector etiqueta="Área" valor={area} onCambio={setArea} opciones={AREAS_DIR.map((a) => ({ id: a, texto: a }))} />
+            <Selector etiqueta="Canal" valor={canal} onCambio={setCanal} opciones={CANALES.map((c) => ({ id: c, texto: c }))} />
+            <div className="relative">
+              <button type="button" onClick={() => setCampana(!campana)} aria-label={`Alertas para Dirección: ${criticas.length}`} className="relative grid size-11 place-items-center rounded-full border border-border bg-card">
+                <Bell size={18} aria-hidden />
+                {criticas.length > 0 && <span className="absolute -top-1 -right-1 grid size-5 place-items-center rounded-full bg-critico text-[11px] font-bold text-white">{criticas.length}</span>}
+              </button>
+              {campana && (
+                <div className="absolute right-0 z-40 mt-2 w-80 rounded-2xl border border-border bg-card p-3 shadow-xl">
+                  <p className="mb-2 text-sm font-semibold">Escala a Dirección</p>
+                  {criticas.length ? (
+                    <ul className="space-y-1.5 text-sm">
+                      {criticas.map((e) => (
+                        <li key={e.id}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCampana(false);
+                              setLateral({ titulo: e.titulo, detalle: e.filas.length ? <TablaSimple columnas={e.columnas} filas={e.filas} /> : null, panel: "excepciones" });
+                            }}
+                            className="w-full rounded-lg bg-critico/10 px-3 py-2 text-left"
+                          >
+                            <b className="text-critico">{e.n}</b> · {e.titulo}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Nada crítico ahora.</p>
+                  )}
+                </div>
+              )}
             </div>
-          )}
-        </main>
-      </div>
+            <button type="button" onClick={() => setOscuro(!oscuro)} aria-label={oscuro ? "Modo claro" : "Modo oscuro"} className="grid size-11 place-items-center rounded-full border border-border bg-card">
+              {oscuro ? <Sun size={18} aria-hidden /> : <Moon size={18} aria-hidden />}
+            </button>
+            <div className="hidden items-center gap-2 pl-2 sm:flex">
+              <span className="grid size-10 place-items-center rounded-full bg-muted text-sm font-bold">{yo.nombre.split(" ").map((p) => p[0]).join("").slice(0, 2)}</span>
+              <div className="text-sm leading-tight">
+                <p className="font-semibold">{yo.nombre}</p>
+                <p className="text-xs text-muted-foreground">{yo.puesto}</p>
+              </div>
+            </div>
+            <button type="button" onClick={() => navegar("/login?salir=1", { replace: true })} aria-label="Cerrar sesión" title="Cerrar sesión" className="grid size-11 place-items-center rounded-full border border-border bg-card">
+              <LogOut size={18} aria-hidden />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-[1440px] px-4 py-6 sm:px-6">
+        <p className="mb-4 text-sm text-muted-foreground">
+          Resultado, capital y pérdida, y riesgo · {area === AREAS_DIR[0] ? "todas las áreas" : area} · {canal === CANALES[0] ? "todos los canales" : canal}
+        </p>
+        <Torre periodo={periodo} abrir={setLateral} />
+      </main>
     </div>
   );
 }

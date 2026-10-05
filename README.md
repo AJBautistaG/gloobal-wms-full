@@ -124,7 +124,8 @@ solicitud.
 ## Dirección General
 
 `/direccion` es la Torre de Control de Dirección (propuesta TO-BE, basada en el módulo de Lovable y ajustada con el
-delta funcional de Dirección). Se organiza en tres preguntas:
+delta funcional de Dirección). Tiene la misma estructura que la torre del supervisor: encabezado con filtros y el
+tablero debajo, sin menú lateral. Se organiza en tres preguntas:
 
 - **Resultado** (¿qué tan bien cumplimos?): fill rate a canales, OTIF de proveedores, cumplimiento del plan de producción.
 - **Capital y pérdida** (¿dónde está el dinero y dónde se erosiona?): impacto económico de excepciones (merma, caducidad,
