@@ -55,10 +55,10 @@ import { TablaSimple } from "../supervisor/Graficas";
 import { Dona, GraficaImpacto, MapaCalor } from "./GraficasDireccion";
 import { Desglose, Panel, Selector, TablaFilas, TablaPorcentaje, type Lateral } from "./PiezasDireccion";
 
-const DIMENSIONES: { id: Kpi["dimension"]; nombre: string; pregunta: string }[] = [
-  { id: "resultado", nombre: "Resultado", pregunta: "¿Qué tan bien estamos cumpliendo?" },
-  { id: "capital", nombre: "Capital y pérdida", pregunta: "¿Dónde está el dinero y dónde se erosiona?" },
-  { id: "riesgo", nombre: "Riesgo", pregunta: "¿Qué puede afectar el negocio?" },
+const DIMENSIONES: { id: Kpi["dimension"]; nombre: string }[] = [
+  { id: "resultado", nombre: "Resultado" },
+  { id: "capital", nombre: "Capital y pérdida" },
+  { id: "riesgo", nombre: "Riesgo" },
 ];
 
 function TarjetaKpi({ k, onAbrir }: { k: Kpi; onAbrir: () => void }) {
@@ -187,7 +187,7 @@ export function Torre({ periodo, abrir }: { periodo: Periodo; abrir: (l: Lateral
           </div>
         ),
       });
-    if (k.desglose) return abrir({ ...base, detalle: <div className="space-y-2"><p className="text-muted-foreground">{k.pregunta} {k.desglose.titulo.toLowerCase()}:</p><TablaPorcentaje columnas={k.desglose.columnas} filas={k.desglose.filas} /></div> });
+    if (k.desglose) return abrir({ ...base, detalle: <div className="space-y-2"><p className="text-muted-foreground">Desglose {k.desglose.titulo.toLowerCase()}</p><TablaPorcentaje columnas={k.desglose.columnas} filas={k.desglose.filas} /></div> });
   };
 
   return (
@@ -199,7 +199,7 @@ export function Torre({ periodo, abrir }: { periodo: Periodo; abrir: (l: Lateral
           return (
             <div key={d.id} className="min-w-0">
               <p className="mb-1.5 text-xs font-semibold tracking-[0.12em] text-muted-foreground uppercase">
-                {d.nombre} <span className="font-normal tracking-normal normal-case">· {d.pregunta}</span>
+                {d.nombre}
               </p>
               <div className={cn("grid gap-3", ks.length === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
                 {ks.map((k) => (
