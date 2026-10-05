@@ -78,8 +78,8 @@ export function analisisDe(panel: PanelId, vivo: { escaladas: Escalada[]; estado
     case "impacto": {
       const sep = totalMes(8);
       const ago = totalMes(7);
-      const t1 = sumar([0, 1, 2].map(totalMes));
-      const t3 = sumar([6, 7, 8].map(totalMes));
+      const t1 = sumar([0, 1, 2].map((i) => totalMes(i)));
+      const t3 = sumar([6, 7, 8].map((i) => totalMes(i)));
       const confirmadas = TOP_EXCEPCIONES.filter((x) => x.confirmada);
       const investigacion = TOP_EXCEPCIONES.filter((x) => !x.confirmada);
       const mayor = [...CAUSAS].sort((a, b) => IMPACTO_MENSUAL[b.id][8] - IMPACTO_MENSUAL[a.id][8])[0];

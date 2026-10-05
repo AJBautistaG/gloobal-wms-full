@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { CAUSAS, ESCENARIO, IMPACTO_MENSUAL, MESES, SUPUESTO_ESCENARIO, totalMes, usd } from "@/data/direccion";
+import { CAUSAS, ESCENARIO, IMPACTO_MENSUAL, MESES, SUPUESTO_ESCENARIO, TODAS, impactoMes, pesoArea, totalMes, usd, type AreaDir } from "@/data/direccion";
 import { Leyenda, TablaSimple } from "../supervisor/Graficas";
 
 function CambiarVista({ tabla, onCambio }: { tabla: boolean; onCambio: () => void }) {
@@ -13,7 +13,7 @@ function CambiarVista({ tabla, onCambio }: { tabla: boolean; onCambio: () => voi
 
 // ── Impacto económico por causa y escenario proyectado ─────────
 
-export function GraficaImpacto() {
+export function GraficaImpacto({ area = TODAS, meses: resaltados = [8] }: { area?: AreaDir; meses?: number[] }) {
   const [tabla, setTabla] = useState(false);
   const [foco, setFoco] = useState<number | null>(null);
   const W = 640;
@@ -21,11 +21,17 @@ export function GraficaImpacto() {
   const izq = 40;
   const abajo = 24;
   const arriba = 14;
-  const tope = 26000;
+  // El escenario del área es el del total en proporción a su peso en septiembre.
+  const peso = pesoArea(area);
+  const base = ESCENARIO.base.map((v) => Math.round(v * peso));
+  const objetivo = ESCENARIO.objetivo.map((v) => Math.round(v * peso));
+  const maximo = Math.max(...IMPACTO_MENSUAL.merma.map((_, i) => totalMes(i, area)), ...base);
+  const paso = maximo > 20000 ? 6500 : maximo > 8000 ? 3000 : maximo > 3000 ? 1000 : 500;
+  const tope = Math.ceil((maximo * 1.08) / (paso * 4)) * paso * 4;
   const ancho = (W - izq) / 12;
   const y = (v: number) => arriba + (H - arriba - abajo) * (1 - v / tope);
   const x = (i: number) => izq + ancho * i + ancho / 2;
-  const linea = (vals: number[]) => [8, 9, 10, 11].map((i, k) => `${k ? "L" : "M"}${x(i)},${y(k === 0 ? totalMes(8) : vals[k - 1])}`).join(" ");
+  const linea = (vals: number[]) => [8, 9, 10, 11].map((i, k) => `${k ? "L" : "M"}${x(i)},${y(k === 0 ? totalMes(8, area) : vals[k - 1])}`).join(" ");
   const meses = IMPACTO_MENSUAL.merma.map((_, i) => i);
   return (
     <div>
@@ -43,18 +49,18 @@ export function GraficaImpacto() {
         <TablaSimple
           columnas={["Mes", ...CAUSAS.map((c) => c.nombre), "Total"]}
           filas={[
-            ...meses.map((i) => [MESES[i], ...CAUSAS.map((c) => usd(IMPACTO_MENSUAL[c.id][i])), usd(totalMes(i))]),
-            ...ESCENARIO.base.map((b, k) => [`${MESES[9 + k]} (escenario)`, "—", "—", "—", "—", `base ${usd(b)} · objetivo ${usd(ESCENARIO.objetivo[k])}`]),
+            ...meses.map((i) => [MESES[i], ...CAUSAS.map((c) => usd(impactoMes(c.id, i, area))), usd(totalMes(i, area))]),
+            ...base.map((b, k) => [`${MESES[9 + k]} (escenario)`, "—", "—", "—", "—", `base ${usd(b)} · objetivo ${usd(objetivo[k])}`]),
           ]}
         />
       ) : (
         <div className="relative">
           <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Impacto económico de excepciones por mes y causa, de enero a septiembre, con escenario proyectado a diciembre" onMouseLeave={() => setFoco(null)}>
-            {[0, 6500, 13000, 19500, 26000].map((v) => (
+            {[0, 1, 2, 3, 4].map((k) => k * (tope / 4)).map((v) => (
               <g key={v}>
                 <line x1={izq} x2={W} y1={y(v)} y2={y(v)} className="stroke-border" strokeDasharray={v ? "3 3" : undefined} />
                 <text x={izq - 6} y={y(v) + 3} textAnchor="end" className="fill-muted-foreground text-[10px]">
-                  {v ? `${v / 1000}K` : 0}
+                  {v ? `${Math.round((v / 1000) * 10) / 10}K` : 0}
                 </text>
               </g>
             ))}
@@ -66,10 +72,10 @@ export function GraficaImpacto() {
               const w = ancho * 0.62;
               let base = 0;
               return (
-                <g key={i} onMouseEnter={() => setFoco(i)} className={cn(foco !== null && foco !== i && "opacity-60")}>
+                <g key={i} onMouseEnter={() => setFoco(i)} className={cn(foco !== null ? foco !== i && "opacity-60" : !resaltados.includes(i) && "opacity-35")}>
                   <rect x={x(i) - ancho / 2} y={arriba} width={ancho} height={H - arriba - abajo} className="fill-transparent" />
                   {CAUSAS.map((c, k) => {
-                    const v = IMPACTO_MENSUAL[c.id][i];
+                    const v = impactoMes(c.id, i, area);
                     const y0 = y(base);
                     const y1 = y(base + v);
                     base += v;
@@ -85,19 +91,19 @@ export function GraficaImpacto() {
                 </g>
               );
             })}
-            <path d={linea(ESCENARIO.base)} fill="none" className="stroke-muted-foreground" strokeWidth={2} strokeDasharray="5 4" />
-            <path d={linea(ESCENARIO.objetivo)} fill="none" className="stroke-exito" strokeWidth={2} strokeDasharray="5 4" />
+            <path d={linea(base)} fill="none" className="stroke-muted-foreground" strokeWidth={2} strokeDasharray="5 4" />
+            <path d={linea(objetivo)} fill="none" className="stroke-exito" strokeWidth={2} strokeDasharray="5 4" />
             {[9, 10, 11].map((i, k) => (
               <g key={i}>
-                <circle cx={x(i)} cy={y(ESCENARIO.base[k])} r={4} className="fill-muted-foreground stroke-card" strokeWidth={2} />
-                <circle cx={x(i)} cy={y(ESCENARIO.objetivo[k])} r={4} className="fill-exito stroke-card" strokeWidth={2} />
+                <circle cx={x(i)} cy={y(base[k])} r={4} className="fill-muted-foreground stroke-card" strokeWidth={2} />
+                <circle cx={x(i)} cy={y(objetivo[k])} r={4} className="fill-exito stroke-card" strokeWidth={2} />
               </g>
             ))}
-            <text x={x(11)} y={y(ESCENARIO.base[2]) - 9} textAnchor="end" className="fill-foreground text-[11px] font-semibold">
-              base {usd(ESCENARIO.base[2])}
+            <text x={x(11)} y={y(base[2]) - 9} textAnchor="end" className="fill-foreground text-[11px] font-semibold">
+              base {usd(base[2])}
             </text>
-            <text x={x(11)} y={y(ESCENARIO.objetivo[2]) + 17} textAnchor="end" className="fill-exito text-[11px] font-semibold">
-              objetivo {usd(ESCENARIO.objetivo[2])}
+            <text x={x(11)} y={y(objetivo[2]) + 17} textAnchor="end" className="fill-exito text-[11px] font-semibold">
+              objetivo {usd(objetivo[2])}
             </text>
             {MESES.map((m, i) => (
               <text key={m} x={x(i)} y={H - 6} textAnchor="middle" className="fill-muted-foreground text-[10px]">
@@ -107,10 +113,10 @@ export function GraficaImpacto() {
           </svg>
           {foco !== null && (
             <span role="tooltip" className="pointer-events-none absolute top-2 z-10 rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-lg" style={{ left: `${Math.min(66, (x(foco) / W) * 100)}%` }}>
-              <b>{MESES[foco]}</b>: USD {usd(totalMes(foco))}
+              <b>{MESES[foco]}</b>: USD {usd(totalMes(foco, area))}
               {CAUSAS.map((c) => (
                 <span key={c.id} className="block">
-                  {c.nombre} {usd(IMPACTO_MENSUAL[c.id][foco])}
+                  {c.nombre} {usd(impactoMes(c.id, foco, area))}
                 </span>
               ))}
             </span>

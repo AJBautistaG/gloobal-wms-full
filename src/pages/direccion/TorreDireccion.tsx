@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import type { PanelId } from "@/data/analisisDireccion";
@@ -9,25 +9,31 @@ import {
   CAUSAS,
   COL_EXACTITUD,
   COL_LOTES,
-  COSTO_PROCESO,
-  CUMPLIMIENTO_CANAL,
-  DETALLE_IMPACTO,
+  COL_IMPACTO_DETALLE,
   DIAS_SEMANA,
   DIFERENCIAS_MES,
-  IMPACTO_MENSUAL,
   INMOVILIZADO,
   MESES,
   META_CUMPLIMIENTO,
   NEGOCIO,
   REGLA_ESCALAMIENTO,
-  RETRASO,
-  TOP_EXCEPCIONES,
+  TODAS,
+  TODOS,
   VALOR_CAMARA,
   VALOR_INVENTARIO,
   VENTANAS_RETRASO,
   caducidadDe,
+  costoDe,
   cumpleMeta,
+  detalleImpacto,
+  filtrarActividad,
+  filtrarCompromisos,
+  filtrarEscaladas,
   impactoDe,
+  impactoMes,
+  negocioDe,
+  retrasoDe,
+  topDe,
   kpis,
   lotesDeBanda,
   periodoDe,
@@ -41,8 +47,8 @@ import {
   type Camara,
   type Compromiso,
   type Escalada,
+  type Filtros,
   type Kpi,
-  type Periodo,
 } from "@/data/direccion";
 import { documentoCompra, documentoSurtido } from "@/data/documentos";
 import { incidenciasStore } from "@/data/incidencias";
@@ -110,10 +116,19 @@ const TONO_ESTADO: Record<Compromiso["tono"], string> = {
   neutro: "bg-muted text-muted-foreground",
 };
 
-export function Torre({ periodo, abrir }: { periodo: Periodo; abrir: (l: Lateral) => void }) {
+export function Torre({ filtros, abrir }: { filtros: Filtros; abrir: (l: Lateral) => void }) {
+  const { periodo, area, canal } = filtros;
   const vivo = useDireccionEnVivo();
-  const lista = kpis(periodo, vivo.exactitud, vivo.estadosLote);
-  const imp = impactoDe(periodo);
+  const lista = kpis(filtros, vivo.exactitud, vivo.estadosLote);
+  const imp = impactoDe(periodo, area);
+  const p = periodoDe(periodo);
+  const filtrado = area !== TODAS || canal !== TODOS;
+  // Los paneles de inventario son una foto del Almacén Central: lo dicen cuando hay filtros.
+  const fotoAlmacen = filtrado ? " · Almacén Central, no cambia por área ni canal" : "";
+  const escaladas = filtrarEscaladas(vivo.escaladas, area);
+  const top = topDe(periodo, area);
+  const negocio = negocioDe(area, canal);
+  const costos = costoDe(periodo);
   const riesgo = valorEnRiesgo(vivo.estadosLote);
   const [camara, setCamara] = useState<Camara>("Todas");
   const [semanas, setSemanas] = useState(4);
@@ -124,11 +139,11 @@ export function Torre({ periodo, abrir }: { periodo: Periodo; abrir: (l: Lateral
   const cad = caducidadDe(camara);
   const enRiesgoCad = cad.vencido + cad["7"] + cad["30"];
   const factorRetraso = VENTANAS_RETRASO.find((v) => v.id === semanas)!.factor;
-  const retraso = Object.entries(RETRASO).map(([n, v]) => [n, v.map((x) => Math.round(x * factorRetraso * 10) / 10)] as [string, number[]]);
-  const totalRetraso = retraso.reduce((s, [, v]) => s + v.reduce((a, b) => a + b, 0), 0);
+  const retraso = retrasoDe(area, canal, factorRetraso);
+  const totalRetraso = retraso.reduce((s, [, v]) => s + v.reduce((a, b) => a + b, 0), 0) || 1;
   const finSemana = retraso.reduce((s, [, v]) => s + v[4] + v[5], 0);
-  const totalCosto = COSTO_PROCESO.reduce((s, c) => s + c.usd, 0);
-  const maxCosto = Math.max(...COSTO_PROCESO.map((c) => c.usd));
+  const totalCosto = costos.reduce((s, c) => s + c.usd, 0);
+  const maxCosto = Math.max(...costos.map((c) => c.usd));
   const totalValor = VALOR_CAMARA.reduce((s, c) => s + c.mp + c.insumos + c.pt, 0);
   const inmov = totalInmovilizado();
   const maxInmov = Math.max(...INMOVILIZADO.map((t) => t.usd));
@@ -137,10 +152,10 @@ export function Torre({ periodo, abrir }: { periodo: Periodo; abrir: (l: Lateral
   const desgloseImpacto = (inicial?: string) =>
     periodo === "mes" ? (
       <Desglose
-        raiz="Impacto de septiembre"
+        raiz={`Impacto de septiembre${area === TODAS ? "" : ` · ${area}`}`}
         total={imp.total}
         inicial={inicial}
-        items={CAUSAS.map((c) => ({ id: c.id, nombre: c.nombre, usd: imp.porCausa[c.id], clase: c.clase, nota: c.definicion, columnas: DETALLE_IMPACTO[c.id].columnas, filas: DETALLE_IMPACTO[c.id].filas }))}
+        items={CAUSAS.map((c) => ({ id: c.id, nombre: c.nombre, usd: imp.porCausa[c.id], clase: c.clase, nota: c.definicion, columnas: COL_IMPACTO_DETALLE, filas: detalleImpacto(c.id, area) }))}
       />
     ) : (
       <div className="space-y-3">
@@ -148,7 +163,7 @@ export function Torre({ periodo, abrir }: { periodo: Periodo; abrir: (l: Lateral
         <TablaSimple
           columnas={["Mes", ...CAUSAS.map((c) => c.nombre), "Total"]}
           filas={[
-            ...periodoDe(periodo).meses.map((i) => [MESES[i], ...CAUSAS.map((c) => usd(IMPACTO_MENSUAL[c.id][i])), usd(CAUSAS.reduce((s, c) => s + IMPACTO_MENSUAL[c.id][i], 0))]),
+            ...p.meses.map((i) => [MESES[i], ...CAUSAS.map((c) => usd(impactoMes(c.id, i, area))), usd(CAUSAS.reduce((s, c) => s + impactoMes(c.id, i, area), 0))]),
             ["Total", ...CAUSAS.map((c) => usd(imp.porCausa[c.id])), usd(imp.total)],
           ]}
         />
@@ -215,7 +230,7 @@ export function Torre({ periodo, abrir }: { periodo: Periodo; abrir: (l: Lateral
 
       <Panel
         titulo="Impacto económico de excepciones y escenario proyectado"
-        subtitulo="ene – sep por causa · oct – dic escenario base contra objetivo con WMS · USD"
+        subtitulo={`${area === TODAS ? "Todas las áreas" : area} · resaltado: ${p.texto.toLowerCase()} · oct – dic escenario base contra objetivo con WMS · USD`}
         className="lg:col-span-6"
         onAnalizar={analizar("impacto", "Impacto económico de excepciones", desgloseImpacto())}
         accion={
@@ -224,12 +239,12 @@ export function Torre({ periodo, abrir }: { periodo: Periodo; abrir: (l: Lateral
           </button>
         }
       >
-        <GraficaImpacto />
+        <GraficaImpacto area={area} meses={p.meses} />
       </Panel>
 
       <Panel
         titulo="Capital inmovilizado"
-        subtitulo="Por días sin movimiento · foto de hoy"
+        subtitulo={`Por días sin movimiento · foto de hoy${fotoAlmacen}`}
         className="lg:col-span-3"
         onAnalizar={analizar("inmovilizado", "Capital inmovilizado", <TablaSimple columnas={["Sin movimiento", "USD"]} filas={INMOVILIZADO.map((t) => [t.tramo, usd(t.usd)])} />)}
       >
@@ -262,7 +277,7 @@ export function Torre({ periodo, abrir }: { periodo: Periodo; abrir: (l: Lateral
 
       <Panel
         titulo="Riesgo de caducidad"
-        subtitulo="Por cámara · foto de hoy · sin empaque"
+        subtitulo={`Por cámara · foto de hoy · sin empaque${fotoAlmacen}`}
         className="lg:col-span-3"
         onAnalizar={analizar("caducidad", "Riesgo de caducidad", <p>Valor por banda de caducidad, {camara === "Todas" ? "todas las cámaras" : `cámara ${camara.toLowerCase()}`}.</p>)}
       >
@@ -283,9 +298,9 @@ export function Torre({ periodo, abrir }: { periodo: Periodo; abrir: (l: Lateral
         </Link>
       </Panel>
 
-      <Panel titulo="Costo operativo por proceso" subtitulo="Capacidad futura · mano de obra y equipo · montos ilustrativos" className="lg:col-span-5" onAnalizar={analizar("costo", "Costo operativo", <TablaSimple columnas={["Proceso", "USD"]} filas={COSTO_PROCESO.map((c) => [c.proceso, usd(c.usd)])} />)}>
+      <Panel titulo="Costo operativo por proceso" subtitulo={`Capacidad futura · ${p.texto.toLowerCase()} · montos ilustrativos`} className="lg:col-span-5" onAnalizar={analizar("costo", "Costo operativo", <TablaSimple columnas={["Proceso", "USD"]} filas={costos.map((c) => [c.proceso, usd(c.usd)])} />)}>
         <ul className="flex h-44 items-end gap-[2px] border-b border-foreground/30" aria-label="Costo por proceso en USD">
-          {COSTO_PROCESO.map((c) => {
+          {costos.map((c) => {
             const mayor = c.usd === maxCosto;
             return (
               <li key={c.proceso} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end">
@@ -315,7 +330,7 @@ export function Torre({ periodo, abrir }: { periodo: Periodo; abrir: (l: Lateral
                               </div>
                             ))}
                           </dl>
-                          <TablaSimple columnas={["Mes", "USD"]} filas={c.historia.map((h, i) => [MESES[6 + i], usd(h)])} />
+                          <TablaSimple columnas={["Mes", "USD"]} filas={p.meses.map((i) => [MESES[i], usd(c.serie[i])])} />
                           <p className="text-xs text-muted-foreground">Requiere tiempos del WMS, costo laboral (RRHH) y costos de equipo e infraestructura (ERP).</p>
                         </div>
                       ),
@@ -329,7 +344,7 @@ export function Torre({ periodo, abrir }: { periodo: Periodo; abrir: (l: Lateral
           })}
         </ul>
         <div className="mt-1.5 flex gap-[2px] text-[11px] text-muted-foreground">
-          {COSTO_PROCESO.map((c) => (
+          {costos.map((c) => (
             <span key={c.proceso} className={cn("min-w-0 flex-1 truncate text-center", c.usd === maxCosto && "font-semibold text-critico")}>
               {c.proceso}
             </span>
@@ -347,8 +362,14 @@ export function Torre({ periodo, abrir }: { periodo: Periodo; abrir: (l: Lateral
         onAnalizar={analizar("retraso", "Horas de retraso", <TablaSimple columnas={["Área", ...DIAS_SEMANA]} filas={retraso.map(([n, v]) => [n, ...v.map((x) => x.toFixed(1))])} />)}
         accion={<Selector etiqueta="Semanas" valor={semanas} onCambio={setSemanas} opciones={VENTANAS_RETRASO.map((v) => ({ id: v.id, texto: v.texto }))} />}
       >
-        <MapaCalor filas={retraso} columnas={DIAS_SEMANA} />
-        <p className="mt-2 text-right text-xs font-semibold text-critico">Viernes y sábado concentran el {Math.round((finSemana / totalRetraso) * 100)} % del retraso · causa por registrar</p>
+        {retraso.length ? (
+          <>
+            <MapaCalor filas={retraso} columnas={DIAS_SEMANA} />
+            <p className="mt-2 text-right text-xs font-semibold text-critico">Viernes y sábado concentran el {Math.round((finSemana / totalRetraso) * 100)} % del retraso · causa por registrar</p>
+          </>
+        ) : (
+          <p className="py-8 text-center text-sm text-muted-foreground">Los pedidos especiales todavía no registran hora comprometida, así que no hay retraso que medir.</p>
+        )}
       </Panel>
 
       <Panel
@@ -367,8 +388,8 @@ export function Torre({ periodo, abrir }: { periodo: Periodo; abrir: (l: Lateral
         }
       >
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {NEGOCIO.map((n) => (
-            <div key={n.nombre} className="min-w-0 border-l border-border pl-2.5" title={`Fuente: ${n.fuente}`}>
+          {negocio.tiles.map((n) => (
+            <div key={n.nombre} className={cn("min-w-0 border-l border-border pl-2.5", !n.activo && "opacity-35")} title={`Fuente: ${n.fuente}`}>
               <p className="text-xs leading-tight text-muted-foreground">{n.nombre}</p>
               <p className="mt-1 text-xl font-semibold tabular-nums">{usd(n.valores[alcance])}</p>
               <p className="text-[11px] text-muted-foreground">
@@ -380,11 +401,11 @@ export function Torre({ periodo, abrir }: { periodo: Periodo; abrir: (l: Lateral
         </div>
         <p className="mt-5 mb-2 text-sm font-semibold">Cumplimiento a la hora prometida, por canal</p>
         <ul className="space-y-2">
-          {CUMPLIMIENTO_CANAL.map((c) => {
+          {negocio.cumplimiento.map((c) => {
             const v = c.valores[alcance];
             const tono = v >= 85 ? "exito" : v >= 70 ? "alerta" : "critico";
             return (
-              <li key={c.canal} className="grid grid-cols-[9rem_minmax(0,1fr)_3rem] items-center gap-3 text-sm">
+              <li key={c.canal} className={cn("grid grid-cols-[9rem_minmax(0,1fr)_3rem] items-center gap-3 text-sm", !c.activo && "opacity-35")}>
                 <span className="truncate">{c.canal}</span>
                 <span className="relative h-2 rounded-full bg-muted">
                   <span className={cn("absolute inset-y-0 left-0 rounded-full", tono === "exito" ? "bg-exito" : tono === "alerta" ? "bg-alerta" : "bg-critico")} style={{ width: `${v}%` }} />
@@ -398,9 +419,9 @@ export function Torre({ periodo, abrir }: { periodo: Periodo; abrir: (l: Lateral
         <p className="mt-2 text-xs text-muted-foreground">La marca vertical es la meta de {META_CUMPLIMIENTO} %.</p>
       </Panel>
 
-      <Panel titulo="Excepciones que escalan a Dirección" subtitulo={REGLA_ESCALAMIENTO} className="lg:col-span-6" onAnalizar={analizar("excepciones", "Excepciones que escalan", <TablaSimple columnas={["Excepción", "Abiertas", "USD"]} filas={vivo.escaladas.map((e) => [e.titulo, e.n, usd(e.impacto)])} />)}>
+      <Panel titulo="Excepciones que escalan a Dirección" subtitulo={REGLA_ESCALAMIENTO} className="lg:col-span-6" onAnalizar={analizar("excepciones", "Excepciones que escalan", <TablaSimple columnas={["Excepción", "Abiertas", "USD"]} filas={escaladas.map((e) => [e.titulo, e.n, usd(e.impacto)])} />)}>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {vivo.escaladas.map((e) => (
+          {escaladas.map((e) => (
             <button key={e.id} type="button" onClick={() => abrir({ titulo: e.titulo, detalle: <DetalleEscalada e={e} />, panel: "excepciones", disponibilidad: e.id === "produccion" ? "D3" : "D2" })} className={cn("rounded-xl p-3 text-left", e.n === 0 ? "bg-muted" : e.tono === "critico" ? "bg-critico/10" : "bg-alerta/10")}>
               <p className={cn("text-2xl font-semibold tabular-nums", e.n === 0 ? "text-muted-foreground" : e.tono === "critico" ? "text-critico" : "text-alerta")}>{e.n}</p>
               <p className="text-sm leading-tight font-semibold">{e.titulo}</p>
@@ -412,7 +433,7 @@ export function Torre({ periodo, abrir }: { periodo: Periodo; abrir: (l: Lateral
 
       <Panel
         titulo="Valor de inventario"
-        subtitulo="USD · foto de hoy"
+        subtitulo={`USD · foto de hoy${fotoAlmacen}`}
         className="lg:col-span-4"
         onAnalizar={analizar("valor", "Valor de inventario", <p>USD {usd(totalValor)} en total.</p>)}
       >
@@ -491,9 +512,10 @@ export function Torre({ periodo, abrir }: { periodo: Periodo; abrir: (l: Lateral
         )}
       </Panel>
 
-      <Panel titulo="Top excepciones por impacto" subtitulo="Septiembre · USD · lo que sigue en investigación no es pérdida" className="lg:col-span-4" onAnalizar={analizar("top", "Top excepciones por impacto", <TablaSimple columnas={["Artículo", "Tipo", "USD", "Estado"]} filas={TOP_EXCEPCIONES.map((x) => [x.articulo, x.tipo, usd(x.usd), x.estado])} />)}>
+      <Panel titulo="Top excepciones por impacto" subtitulo={`${p.texto} · ${area === TODAS ? "todas las áreas" : area} · USD · lo que sigue en investigación no es pérdida`} className="lg:col-span-4" onAnalizar={analizar("top", "Top excepciones por impacto", <TablaSimple columnas={["Artículo", "Tipo", "USD", "Estado"]} filas={top.map((x) => [x.articulo, x.tipo, usd(x.usd), x.estado])} />)}>
         <ul className="divide-y divide-border text-sm">
-          {TOP_EXCEPCIONES.map((x) => (
+          {top.length === 0 && <li className="py-6 text-center text-muted-foreground">Sin excepciones de impacto para esta área.</li>}
+          {top.map((x) => (
             <li key={x.codigo}>
               <button
                 type="button"
@@ -544,7 +566,8 @@ export function Torre({ periodo, abrir }: { periodo: Periodo; abrir: (l: Lateral
 
       <Panel titulo="Actividad en tiempo real" subtitulo="El pulso de la operación: lo relevante, no cada movimiento" className="lg:col-span-4" accion={<span className="inline-flex items-center gap-1.5 text-xs font-semibold text-exito"><span className="size-2 animate-pulse rounded-full bg-exito" aria-hidden /> En vivo</span>}>
         <ol className="space-y-2.5">
-          {vivo.actividad.map((x, n) => (
+          {filtrarActividad(vivo.actividad, area).length === 0 && <li className="text-sm text-muted-foreground">Sin actividad relevante de esta área hoy.</li>}
+          {filtrarActividad(vivo.actividad, area).map((x, n) => (
             <li key={n} className="grid grid-cols-[3rem_minmax(0,1fr)] gap-2 text-sm">
               <span className="text-xs text-muted-foreground tabular-nums">{x.hora}</span>
               <span className="min-w-0">
@@ -559,7 +582,7 @@ export function Torre({ periodo, abrir }: { periodo: Periodo; abrir: (l: Lateral
         </ol>
       </Panel>
 
-      <Compromisos lista={vivo.compromisos} abrir={abrir} />
+      <Compromisos lista={filtrarCompromisos(vivo.compromisos, area, canal)} abrir={abrir} />
     </div>
   );
 }
@@ -620,6 +643,8 @@ function Compromisos({ lista, abrir }: { lista: Compromiso[]; abrir: (l: Lateral
     [lista, orden],
   );
   const paginas = Math.max(1, Math.ceil(ordenada.length / POR_PAGINA));
+  // Al cambiar los filtros, regresa a la primera página.
+  useEffect(() => setPagina(0), [lista.length]);
   const visibles = ordenada.slice(pagina * POR_PAGINA, (pagina + 1) * POR_PAGINA);
 
   const exportar = () => {
@@ -709,6 +734,13 @@ function Compromisos({ lista, abrir }: { lista: Compromiso[]; abrir: (l: Lateral
             </tr>
           </thead>
           <tbody>
+            {visibles.length === 0 && (
+              <tr>
+                <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                  Sin compromisos abiertos con estos filtros.
+                </td>
+              </tr>
+            )}
             {visibles.map((c) => (
               <tr key={c.folio} className="border-t border-border">
                 <td className="py-2.5 font-mono text-xs font-semibold">{c.folio}</td>

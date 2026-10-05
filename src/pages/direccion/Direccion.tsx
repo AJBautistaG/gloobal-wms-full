@@ -4,7 +4,7 @@ import { Bell, CalendarClock, LogOut, Moon, Sun, X } from "lucide-react";
 import { usePda } from "@/context/PdaContext";
 import { analisisDe } from "@/data/analisisDireccion";
 import type { EstadoLote } from "@/data/caducidad";
-import { AREAS_DIR, CANALES, DIRECTOR, PERIODOS, useDireccionEnVivo, type Escalada, type Periodo } from "@/data/direccion";
+import { AREAS_DIR, CANALES, DIRECTOR, PERIODOS, TODAS, TODOS, filtrarEscaladas, useDireccionEnVivo, type AreaDir, type Canal, type Escalada, type Periodo } from "@/data/direccion";
 import { FechaHoy, useFechaHoy } from "@/lib/fecha";
 import { useSesion } from "@/lib/sesion";
 import { cn } from "@/lib/utils";
@@ -130,12 +130,12 @@ export default function Direccion() {
   const navegar = useNavigate();
   const yo = sesion ?? { nombre: DIRECTOR.nombre, puesto: DIRECTOR.puesto };
   const [periodo, setPeriodo] = useState<Periodo>("mes");
-  const [area, setArea] = useState(AREAS_DIR[0]);
-  const [canal, setCanal] = useState(CANALES[0]);
+  const [area, setArea] = useState<AreaDir>(TODAS);
+  const [canal, setCanal] = useState<Canal>(TODOS);
   const [lateral, setLateral] = useState<Lateral | null>(null);
   const [campana, setCampana] = useState(false);
   const vivo = useDireccionEnVivo();
-  const criticas = vivo.escaladas.filter((e) => e.n > 0 && e.tono === "critico");
+  const criticas = filtrarEscaladas(vivo.escaladas, area).filter((e) => e.n > 0 && e.tono === "critico");
 
   useEffect(() => {
     document.title = "Torre de Control · Dirección · Momi WMS";
@@ -225,9 +225,14 @@ export default function Direccion() {
 
       <main className="mx-auto max-w-[1440px] px-4 py-6 sm:px-6">
         <p className="mb-4 text-sm text-muted-foreground">
-          Resultado, capital y pérdida, y riesgo · {area === AREAS_DIR[0] ? "todas las áreas" : area} · {canal === CANALES[0] ? "todos los canales" : canal}
+          {PERIODOS.find((p) => p.id === periodo)!.texto} ({PERIODOS.find((p) => p.id === periodo)!.rango}) · {area === TODAS ? "todas las áreas" : area} · {canal === TODOS ? "todos los canales" : canal}
+          {(area !== TODAS || canal !== TODOS) && (
+            <button type="button" onClick={() => { setArea(TODAS); setCanal(TODOS); }} className="ml-2 font-semibold text-primary underline underline-offset-4">
+              Quitar filtros
+            </button>
+          )}
         </p>
-        <Torre periodo={periodo} abrir={setLateral} />
+        <Torre filtros={{ periodo, area, canal }} abrir={setLateral} />
       </main>
     </div>
   );

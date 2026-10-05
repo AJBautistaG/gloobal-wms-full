@@ -134,6 +134,11 @@ tablero debajo, sin menú lateral. Se organiza en tres preguntas:
 - **Riesgo** (¿qué puede afectar el negocio?): valor económico en riesgo, exactitud de inventario, riesgo de caducidad en
   cuatro bandas (vencido, ≤ 7, 8–30, > 30 días), excepciones que escalan con impacto, responsable y siguiente acción.
 
+Filtros: la **fecha** cambia los flujos del periodo (impacto, fill rate, OTIF, plan, costos y top de excepciones) y
+resalta esos meses en la gráfica; el **área** cambia impacto, fill rate, plan, retraso, excepciones, top, compromisos
+y actividad; el **canal** cambia fill rate, retraso, negocio y compromisos. Inventario, caducidad y capital son una
+foto del Almacén Central y lo dicen cuando hay filtros. El reparto por área suma exacto el total de cada mes.
+
 Reglas de la maqueta:
 
 - **Desglose en niveles:** cada indicador abre Dirección → causa o dominio → detalle operacional (artículo, lote,
