@@ -40,7 +40,7 @@ export function GraficaImpacto({ area = TODAS, meses: resaltados = [8] }: { area
           series={[
             ...CAUSAS.map((c) => ({ texto: c.nombre, clase: c.clase })),
             { texto: "Escenario base", clase: "bg-muted-foreground" },
-            { texto: "Escenario objetivo con WMS", clase: "bg-exito" },
+            { texto: "Escenario objetivo", clase: "bg-exito" },
           ]}
         />
         <CambiarVista tabla={tabla} onCambio={() => setTabla((t) => !t)} />

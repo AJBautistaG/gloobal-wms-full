@@ -230,7 +230,7 @@ export function Torre({ filtros, abrir }: { filtros: Filtros; abrir: (l: Lateral
 
       <Panel
         titulo="Impacto económico de excepciones y escenario proyectado"
-        subtitulo={`${area === TODAS ? "Todas las áreas" : area} · resaltado: ${p.texto.toLowerCase()} · oct – dic escenario base contra objetivo con WMS · USD`}
+        subtitulo={`${area === TODAS ? "Todas las áreas" : area} · resaltado: ${p.texto.toLowerCase()} · oct – dic escenario base contra escenario objetivo · USD`}
         className="lg:col-span-6"
         onAnalizar={analizar("impacto", "Impacto económico de excepciones", desgloseImpacto())}
         accion={

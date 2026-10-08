@@ -86,7 +86,7 @@ export function analisisDe(panel: PanelId, vivo: { escaladas: Escalada[]; estado
       return {
         pasando: `Las excepciones costaron USD ${usd(sep)} en septiembre, ${(((sep / ago) - 1) * 100).toFixed(1)} % más que en agosto. ${mayor.nombre} es la causa más grande: USD ${usd(IMPACTO_MENSUAL[mayor.id][8])}.`,
         porque: `Por causa: ${CAUSAS.map((c) => `${c.nombre.toLowerCase()} ${usd(IMPACTO_MENSUAL[c.id][8])}`).join(", ")}. Las seis excepciones confirmadas más grandes suman USD ${usd(sumar(confirmadas.map((x) => x.usd)))}. ${investigacion.map((x) => `${x.articulo} (USD ${usd(x.usd)})`).join(", ")} sigue en investigación y no cuenta como pérdida.`,
-        siNo: `El último trimestre pesa ${Math.round((t3 / t1 - 1) * 100)} % más que el primero. En el escenario base, diciembre llegaría a USD ${usd(ESCENARIO.base[2])}; en el escenario objetivo con WMS, a ${usd(ESCENARIO.objetivo[2])}. Es una proyección con supuestos de reducción, no un resultado garantizado.`,
+        siNo: `El último trimestre pesa ${Math.round((t3 / t1 - 1) * 100)} % más que el primero. En el escenario base, diciembre llegaría a USD ${usd(ESCENARIO.base[2])}; en el escenario objetivo, a ${usd(ESCENARIO.objetivo[2])}. Es una proyección con supuestos de reducción, no un resultado garantizado.`,
         acciones: [accionLotes, accionSurtidor, accionProveedor],
         noSe: `No sé cuánta merma es de manipulación y cuánta de sobrecompra, porque los ajustes se capturan con texto libre. El desabasto está valuado a costo: el margen no capturado por desabasto necesita precio de venta y demanda no atendida, que hoy no están integrados.`,
       };
