@@ -576,6 +576,12 @@ export function detalleRetraso(fila: string, dia: number, valor: number, semanas
   });
 }
 
+/** Del primer al último día que cubre el mapa: las últimas N semanas de lunes a sábado antes de hoy. */
+export function periodoRetraso(semanas: number) {
+  const fechas = [0, 1, 2, 3, 4, 5].flatMap((dia) => detalleRetraso("Panadería", dia, 1, semanas).map((x) => x.fecha)).sort();
+  return { desde: fechas[0], hasta: fechas[fechas.length - 1] };
+}
+
 export function retrasoDe(area: AreaDir, canal: Canal, factor: number): [string, number[]][] {
   const porCanal: Record<string, string[]> = {
     "Áreas de producción": ["Panadería", "Dulcería", "Cocina"],

@@ -27,6 +27,7 @@ import {
   cumpleMeta,
   detalleImpacto,
   detalleRetraso,
+  periodoRetraso,
   EVENTOS_SIMULADOS,
   filtrarActividad,
   horasTexto,
@@ -403,7 +404,7 @@ export function Torre({ filtros, abrir }: { filtros: Filtros; abrir: (l: Lateral
 
       <Panel
         titulo="Horas de retraso por área y día"
-        subtitulo={`Promedio en horas · ${semanas} semanas · toca un cuadro para ver los pedidos`}
+        subtitulo={`Periodo: ${fechaCorta(periodoRetraso(semanas).desde)} al ${fechaCorta(periodoRetraso(semanas).hasta)} · promedio en horas · toca un cuadro para ver los pedidos`}
         className="lg:col-span-7"
         onAnalizar={analizar("retraso", "Horas de retraso", <TablaSimple columnas={["Área", ...DIAS_SEMANA]} filas={retraso.map(([n, v]) => [n, ...v.map((x) => x.toFixed(1))])} />)}
         accion={<Selector etiqueta="Semanas" valor={semanas} onCambio={setSemanas} opciones={VENTANAS_RETRASO.map((v) => ({ id: v.id, texto: v.texto }))} />}
@@ -426,12 +427,12 @@ export function Torre({ filtros, abrir }: { filtros: Filtros; abrir: (l: Lateral
                         <p className="text-xs text-muted-foreground">Retraso promedio</p>
                         <p className="text-2xl font-semibold">{horasTexto(valor)}</p>
                         <p className="text-xs text-muted-foreground">
-                          Promedio de los últimos {pedidos.length} {nombreDia}: {horasTexto(pedidos.reduce((s, x) => s + x.retrasoMin, 0) / 60)} en total ÷ {pedidos.length}
+                          Periodo: {fechaCorta(pedidos[pedidos.length - 1].fecha)} al {fechaCorta(pedidos[0].fecha)} · promedio de los últimos {pedidos.length} {nombreDia}: {horasTexto(pedidos.reduce((s, x) => s + x.retrasoMin, 0) / 60)} en total ÷ {pedidos.length}
                         </p>
                       </div>
                       <TablaSimple
-                        columnas={["Fecha", "Folio", "Comprometido", "Salió", "Retraso", "USD"]}
-                        filas={pedidos.map((x) => [fechaCorta(x.fecha), x.folio, x.comprometido, x.salio, horasTexto(x.retrasoMin / 60), usd(x.usd)])}
+                        columnas={["Fecha", "Folio", "Comprometido", "Salió", "Retraso"]}
+                        filas={pedidos.map((x) => [fechaCorta(x.fecha), x.folio, x.comprometido, x.salio, horasTexto(x.retrasoMin / 60)])}
                       />
                       <p className="text-xs text-muted-foreground">Retraso = hora en que salió − hora comprometida. La causa de cada retraso todavía no se registra.</p>
                     </div>
