@@ -298,7 +298,7 @@ export function Torre({ filtros, abrir }: { filtros: Filtros; abrir: (l: Lateral
         </Link>
       </Panel>
 
-      <Panel titulo="Costo operativo por proceso" subtitulo={`Capacidad futura · ${p.texto.toLowerCase()} · montos ilustrativos`} className="lg:col-span-5" onAnalizar={analizar("costo", "Costo operativo", <TablaSimple columnas={["Proceso", "USD"]} filas={costos.map((c) => [c.proceso, usd(c.usd)])} />)}>
+      <Panel titulo="Costo operativo por proceso de Almacén" subtitulo={`Capacidad futura · ${p.texto.toLowerCase()} · montos ilustrativos`} className="lg:col-span-5" onAnalizar={analizar("costo", "Costo operativo por proceso de Almacén", <TablaSimple columnas={["Proceso", "USD"]} filas={costos.map((c) => [c.proceso, usd(c.usd)])} />)}>
         <ul className="flex h-44 items-end gap-[2px] border-b border-foreground/30" aria-label="Costo por proceso en USD">
           {costos.map((c) => {
             const mayor = c.usd === maxCosto;
