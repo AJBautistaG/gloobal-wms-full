@@ -151,6 +151,36 @@
   animation: barrido 2s ease-in-out infinite;
 }
 
+/* Actividad en tiempo real: el evento nuevo entra desde arriba y se resalta un momento. */
+@keyframes entra-evento {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes resalta-evento {
+  from {
+    background: var(--primary-soft);
+  }
+  to {
+    background: transparent;
+  }
+}
+.evento-nuevo {
+  animation:
+    entra-evento 0.45s ease-out,
+    resalta-evento 2.5s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .evento-nuevo {
+    animation: none;
+  }
+}
+
 /* Impresión de órdenes: al imprimir se monta una copia del documento directo en <body> y se oculta lo demás. */
 .zona-impresion {
   display: none;

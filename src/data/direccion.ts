@@ -766,6 +766,25 @@ export interface Actividad {
   tono: "critico" | "alerta" | "info";
 }
 
+/**
+ * Eventos que la maqueta simula mientras se navega la torre, para mostrar cómo se ve el pulso
+ * en vivo. Son hechos que no cambian las cifras de los demás paneles.
+ */
+export const EVENTOS_SIMULADOS: Omit<Actividad, "ts" | "hora">[] = [
+  { titulo: "Conteo cíclico cerrado", detalle: "Pasillo PA-R12 · 97.8 % de exactitud", tono: "info" },
+  { titulo: "Producción de Panadería arrancó el turno", detalle: "Plan del día: 680 unidades", tono: "info" },
+  { titulo: "Alerta de temperatura en cámara PB-CF2", detalle: "6.1 °C durante 4 min · ya está en rango", tono: "alerta" },
+  { titulo: "Pedido especial ESP-0096 programado", detalle: "Pastel para evento · mañana 10:00", tono: "info" },
+  { titulo: "Dulcería registró merma en su área", detalle: "2 bandejas de merengue · causa: humedad", tono: "alerta" },
+  { titulo: "Reposición del frente PB-R02 completada", detalle: "Harinas y azúcares listos para surtir", tono: "info" },
+  { titulo: "Pedido web fuera de corte", detalle: "WEB-344 · se entrega mañana", tono: "alerta" },
+  { titulo: "Cocina confirmó cobertura para mañana", detalle: "Plan del jueves cubierto con su existencia", tono: "info" },
+  { titulo: "Montacargas MC-02 en mantenimiento", detalle: "Regresa a las 16:00 · el surtido sigue con MC-01", tono: "alerta" },
+  { titulo: "Panadería registró su consumo del día", detalle: "Existencias del área actualizadas", tono: "info" },
+  { titulo: "Conteo cíclico cerrado", detalle: "Cámara PB-CF1 · 100 % de exactitud", tono: "info" },
+  { titulo: "Ruta de tiendas cargando en andén", detalle: "Tocumen, La Doña y Brisas del Golf", tono: "info" },
+];
+
 /** Tipos de incidencia que importan a Dirección (no todo el registro técnico). */
 const RELEVANTES = new Set(["vida_util", "lote_distinto", "diferencia_area", "faltante_surtido", "dano", "saldo"]);
 

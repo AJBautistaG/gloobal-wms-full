@@ -27,6 +27,7 @@ import {
   cumpleMeta,
   detalleImpacto,
   detalleRetraso,
+  EVENTOS_SIMULADOS,
   filtrarActividad,
   horasTexto,
   filtrarCompromisos,
@@ -44,6 +45,7 @@ import {
   usdCorto,
   useDireccionEnVivo,
   valorEnRiesgo,
+  type Actividad,
   type Alcance,
   type Banda,
   type Camara,
@@ -111,6 +113,45 @@ function TarjetaKpi({ k, onAbrir }: { k: Kpi; onAbrir: () => void }) {
   );
 }
 
+/**
+ * Pulso en vivo para la demo: cada 7 a 11 segundos entra un evento nuevo mientras la torre está
+ * a la vista (se detiene si la pestaña no está visible).
+ */
+function useActividadEnVivo() {
+  const [simulados, setSimulados] = useState<Actividad[]>([]);
+  const [ahora, setAhora] = useState(Date.now());
+  useEffect(() => {
+    let siguiente = 0;
+    let espera: ReturnType<typeof setTimeout>;
+    const programar = (ms: number) => {
+      espera = setTimeout(() => {
+        if (document.visibilityState === "visible") {
+          const e = EVENTOS_SIMULADOS[siguiente++ % EVENTOS_SIMULADOS.length];
+          const ts = Date.now();
+          const hora = new Date(ts).toTimeString().slice(0, 5);
+          setSimulados((xs) => [{ ...e, ts, hora }, ...xs].slice(0, 8));
+        }
+        programar(7000 + Math.random() * 4000);
+      }, ms);
+    };
+    programar(4000);
+    const reloj = setInterval(() => setAhora(Date.now()), 5000);
+    return () => {
+      clearTimeout(espera);
+      clearInterval(reloj);
+    };
+  }, []);
+  return { simulados, ahora };
+}
+
+function haceCuanto(ts: number, ahora: number, hora: string) {
+  const s = Math.max(0, Math.floor((ahora - ts) / 1000));
+  if (s < 10) return "ahora";
+  if (s < 60) return `hace ${s} s`;
+  if (s < 3600) return `hace ${Math.floor(s / 60)} min`;
+  return hora;
+}
+
 const TONO_ESTADO: Record<Compromiso["tono"], string> = {
   critico: "bg-critico/15 text-critico",
   alerta: "bg-alerta/15 text-alerta",
@@ -131,6 +172,9 @@ export function Torre({ filtros, abrir }: { filtros: Filtros; abrir: (l: Lateral
   const top = topDe(periodo, area);
   const negocio = negocioDe(area, canal);
   const costos = costoDe(periodo);
+  const pulso = useActividadEnVivo();
+  const actividad = filtrarActividad([...pulso.simulados, ...vivo.actividad].sort((a, b) => b.ts - a.ts), area).slice(0, 8);
+  const ultimo = actividad[0];
   const riesgo = valorEnRiesgo(vivo.estadosLote);
   const [camara, setCamara] = useState<Camara>("Todas");
   const [semanas, setSemanas] = useState(4);
@@ -594,12 +638,24 @@ export function Torre({ filtros, abrir }: { filtros: Filtros; abrir: (l: Lateral
         </ul>
       </Panel>
 
-      <Panel titulo="Actividad en tiempo real" subtitulo="El pulso de la operación: lo relevante, no cada movimiento" className="lg:col-span-4" accion={<span className="inline-flex items-center gap-1.5 text-xs font-semibold text-exito"><span className="size-2 animate-pulse rounded-full bg-exito" aria-hidden /> En vivo</span>}>
-        <ol className="space-y-2.5">
-          {filtrarActividad(vivo.actividad, area).length === 0 && <li className="text-sm text-muted-foreground">Sin actividad relevante de esta área hoy.</li>}
-          {filtrarActividad(vivo.actividad, area).map((x, n) => (
-            <li key={n} className="grid grid-cols-[3rem_minmax(0,1fr)] gap-2 text-sm">
-              <span className="text-xs text-muted-foreground tabular-nums">{x.hora}</span>
+      <Panel
+        titulo="Actividad en tiempo real"
+        subtitulo="El pulso de la operación: lo relevante, no cada movimiento"
+        className="lg:col-span-4"
+        accion={
+          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-exito" aria-live="polite">
+            <span className="size-2 animate-pulse rounded-full bg-exito" aria-hidden /> En vivo
+            {ultimo && <span className="font-normal text-muted-foreground">· {haceCuanto(ultimo.ts, pulso.ahora, ultimo.hora)}</span>}
+          </span>
+        }
+      >
+        <ol className="space-y-1">
+          {actividad.length === 0 && <li className="text-sm text-muted-foreground">Sin actividad relevante de esta área hoy.</li>}
+          {actividad.map((x) => (
+            <li key={`${x.ts}-${x.titulo}`} className={cn("grid grid-cols-[4.2rem_minmax(0,1fr)] gap-2 rounded-lg px-1.5 py-1 text-sm", pulso.ahora - x.ts < 6000 && Date.now() - x.ts < 6000 && "evento-nuevo")}>
+              <span className="pt-0.5 text-xs text-muted-foreground tabular-nums" title={x.hora}>
+                {haceCuanto(x.ts, pulso.ahora, x.hora)}
+              </span>
               <span className="min-w-0">
                 <span className="flex items-start gap-1.5 font-semibold">
                   <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", x.tono === "critico" ? "bg-critico" : x.tono === "alerta" ? "bg-alerta" : "bg-frio")} aria-hidden />
