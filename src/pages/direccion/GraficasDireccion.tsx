@@ -215,7 +215,7 @@ export function Dona({ rebanadas, centro, subcentro, onElegir }: { rebanadas: Re
 
 // ── Mapa de calor ───────────────────────────────────────────────
 
-export function MapaCalor({ filas, columnas, maximo = 6, unidad = "h" }: { filas: [string, number[]][]; columnas: string[]; maximo?: number; unidad?: string }) {
+export function MapaCalor({ filas, columnas, maximo = 6, unidad = "h", onCelda }: { filas: [string, number[]][]; columnas: string[]; maximo?: number; unidad?: string; onCelda?: (fila: string, columna: number, valor: number) => void }) {
   const [tabla, setTabla] = useState(false);
   return (
     <div>
@@ -249,11 +249,17 @@ export function MapaCalor({ filas, columnas, maximo = 6, unidad = "h" }: { filas
                       <td
                         key={i}
                         title={`${nombre} · ${columnas[i]}: ${v.toFixed(1)} ${unidad}`}
-                        className={cn("h-9 rounded-[4px] text-center font-semibold tabular-nums", t > 0.55 ? "text-white" : "text-foreground")}
+                        className={cn("h-9 rounded-[4px] p-0 text-center font-semibold tabular-nums", t > 0.55 ? "text-white" : "text-foreground")}
                         // Una sola tonalidad (rojo de alerta) de claro a oscuro: más horas, más intenso.
                         style={{ background: `color-mix(in oklch, var(--critico) ${Math.round(12 + t * 88)}%, var(--card))` }}
                       >
-                        {v.toFixed(1)}
+                        {onCelda ? (
+                          <button type="button" onClick={() => onCelda(nombre, i, v)} aria-label={`${nombre}, ${columnas[i]}: ${v.toFixed(1)} ${unidad} de retraso. Ver pedidos`} className="size-full min-h-9 rounded-[4px] hover:ring-2 hover:ring-foreground/40 focus-visible:ring-2 focus-visible:ring-foreground focus-visible:outline-none">
+                            {v.toFixed(1)}
+                          </button>
+                        ) : (
+                          v.toFixed(1)
+                        )}
                       </td>
                     );
                   })}

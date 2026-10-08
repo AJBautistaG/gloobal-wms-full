@@ -518,6 +518,64 @@ export function negocioDe(area: AreaDir, canal: Canal) {
 }
 
 /** Filas del mapa de retraso según el área o el canal elegidos. */
+/** "5.4" horas → "5 h 24 min". */
+export function horasTexto(h: number) {
+  const min = Math.round(h * 60);
+  const hh = Math.floor(min / 60);
+  const mm = min % 60;
+  return hh ? `${hh} h${mm ? ` ${String(mm).padStart(2, "0")} min` : ""}` : `${mm} min`;
+}
+
+const COMPROMISO_FILA: Record<string, { hora: string; folio: (fecha: string, k: number) => string; usd: number }> = {
+  Panadería: { hora: "10:00", folio: (f, k) => `SOL-PAN-${f}-0${16 + k}`, usd: 520 },
+  Dulcería: { hora: "10:20", folio: (f, k) => `SOL-DUL-${f}-0${15 + k}`, usd: 610 },
+  Cocina: { hora: "10:12", folio: (f, k) => `SOL-COC-${f}-0${14 + k}`, usd: 470 },
+  "Tiendas · rutas": { hora: "11:00", folio: (f) => `ENT-RTE-${f}-011`, usd: 1240 },
+  "E-commerce": { hora: "15:00", folio: (_, k) => `WEB-${318 + k * 7}`, usd: 380 },
+};
+/** Variación de cada semana alrededor del promedio (se corrige para que el promedio sea exacto). */
+const VARIACION = [-0.2, 0.12, -0.08, 0.16, -0.05, 0.1, -0.14, 0.06, 0.03, -0.11, 0.15, -0.04];
+
+export interface PedidoRetrasado {
+  fecha: string;
+  folio: string;
+  comprometido: string;
+  salio: string;
+  retrasoMin: number;
+  usd: number;
+}
+
+/**
+ * Los pedidos detrás de un cuadro del mapa: uno por cada ese día de la semana del periodo
+ * (4, 8 o 12 semanas). Su promedio da exactamente el valor del cuadro.
+ */
+export function detalleRetraso(fila: string, dia: number, valor: number, semanas: number): PedidoRetrasado[] {
+  const conf = COMPROMISO_FILA[fila];
+  const objetivo = Math.round(valor * 60);
+  const minutos = VARIACION.slice(0, semanas).map((v) => Math.max(0, Math.round(objetivo * (1 + v))));
+  minutos[minutos.length - 1] += objetivo * semanas - minutos.reduce((a, b) => a + b, 0);
+  // El último ese-día-de-la-semana antes de hoy y las semanas anteriores.
+  const hoy = new Date(`${HOY}T12:00:00`);
+  const jsDia = dia + 1; // LUN = 1 … SÁB = 6
+  const atras = (hoy.getDay() - jsDia + 7) % 7 || 7;
+  const [h, m] = conf.hora.split(":").map(Number);
+  return minutos.map((min, k) => {
+    const fecha = new Date(hoy);
+    fecha.setDate(hoy.getDate() - atras - 7 * k);
+    const iso = fecha.toISOString().slice(0, 10);
+    const folio = iso.slice(8, 10) + iso.slice(5, 7) + iso.slice(2, 4);
+    const sale = h * 60 + m + min;
+    return {
+      fecha: iso,
+      folio: conf.folio(folio, k % 3),
+      comprometido: conf.hora,
+      salio: `${String(Math.floor(sale / 60) % 24).padStart(2, "0")}:${String(sale % 60).padStart(2, "0")}`,
+      retrasoMin: min,
+      usd: Math.round(conf.usd * (1 + VARIACION[(k + 3) % VARIACION.length])),
+    };
+  });
+}
+
 export function retrasoDe(area: AreaDir, canal: Canal, factor: number): [string, number[]][] {
   const porCanal: Record<string, string[]> = {
     "Áreas de producción": ["Panadería", "Dulcería", "Cocina"],

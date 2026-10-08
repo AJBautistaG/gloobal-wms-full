@@ -140,12 +140,18 @@ export function analisisDe(panel: PanelId, vivo: { escaladas: Escalada[]; estado
       const filas = Object.entries(RETRASO);
       const total = sumar(filas.flatMap(([, v]) => v));
       const finDeSemana = sumar(filas.flatMap(([, v]) => [v[4], v[5]]));
+      const entreSemana = sumar(filas.flatMap(([, v]) => v.slice(0, 4))) / 4;
+      const pico = finDeSemana / 2;
       return {
-        pasando: `Viernes y sábado concentran el ${Math.round((finDeSemana / total) * 100)} % de las horas de retraso. Tiendas · rutas llega a 5.8 h el sábado.`,
-        porque: `El dato muestra el patrón, no la causa: la maqueta no registra por qué se retrasó cada compromiso.`,
-        siNo: `Si el patrón sigue, los compromisos del fin de semana seguirán saliendo tarde.`,
-        acciones: [{ titulo: "Definir compromiso y causa de retraso", detalle: "Hora objetivo, hora real y causa obligatoria al cerrar cada entrega", decide: "Eduardo", para: "este mes", vale: "Saber dónde actuar" }],
-        noSe: `No sé si el retraso viene del almacén, de producción o de transporte, porque la causa no se captura.`,
+        pasando: `El retraso no está repartido: viernes y sábado concentran el ${Math.round((finDeSemana / total) * 100)} % de todas las horas de la semana.`,
+        porque: `De lunes a jueves se acumulan en promedio ${entreSemana.toFixed(1)} h de retraso por día; viernes y sábado suben a ${pico.toFixed(1)} h por día, ${(pico / entreSemana).toFixed(1)} veces más. El peor cruce es Tiendas · rutas el sábado, con 5.8 h. Las cinco filas empeoran los mismos dos días, lo que apunta a capacidad de surtido y entrega más que a una sola área.`,
+        siNo: `Cada fin de semana se repiten unas ${Math.round(finDeSemana)} h de retraso acumulado, con la ruta de tiendas saliendo más de cinco horas tarde, justo cuando más se vende.`,
+        acciones: [
+          { titulo: "Segundo surtidor solo viernes y sábado", detalle: "Reforzar únicamente los dos días pico, no toda la semana", decide: "Eduardo", para: "este viernes", vale: "USD 1,180 / semana", enlace: { texto: "Abrir la cola de surtido", ruta: "/supervisor?ver=surtido" } },
+          { titulo: "Adelantar el corte de pedidos del viernes", detalle: "Cerrar los pedidos del viernes el jueves a las 16:00 para armarlos la noche anterior", decide: "Eduardo y jefes de área", para: "próxima semana", vale: "—" },
+          { titulo: "Revisar la ruta de tiendas del sábado", detalle: "Saber si el retraso es del surtido o del camión", decide: "Jefe de almacén", para: "esta semana", vale: "—" },
+        ],
+        noSe: `Son promedios de varias semanas: no distinguen una semana mala de un patrón estable. Tampoco sé si el retraso del sábado es por volumen de pedidos o por menos personal, ni si viene del almacén, de producción o del transporte, porque la causa no se captura.`,
       };
     }
     case "negocio":
